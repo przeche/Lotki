@@ -169,14 +169,27 @@
                 </button>
             </div>
 
-            <div class="p-3 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
+            <div id="modal-scroll-body" class="p-3 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
                 <div id="step-1-upload" class="space-y-4">
-                    <div id="drop-zone" class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl p-6 sm:p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[200px]">
-                        <input type="file" id="input-photo" accept="image/*" class="hidden">
-                        <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
-                            <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                    <!-- Dual Inputs for File Upload & Direct Camera Capture -->
+                    <input type="file" id="input-photo" accept="image/*" class="hidden">
+                    <input type="file" id="input-camera" accept="image/*" capture="environment" class="hidden">
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div id="btn-trigger-upload" class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/60 rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[180px]">
+                            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
+                                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-700">Upload Image File</p>
+                            <p class="text-xs text-slate-500 mt-1">Select scorecard photo from gallery</p>
                         </div>
-                        <p class="text-sm font-semibold text-slate-700">Tap to upload or take game scorecard photo</p>
+                        <div id="btn-trigger-camera" class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/60 rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[180px]">
+                            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
+                                <i data-lucide="camera" class="w-6 h-6"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-700">Take Photo via Camera</p>
+                            <p class="text-xs text-slate-500 mt-1">Capture directly using device camera</p>
+                        </div>
                     </div>
                 </div>
 
@@ -217,7 +230,8 @@
                         <div class="flex items-center justify-between mb-2">
                             <h4 class="font-bold text-xs sm:text-sm text-slate-800">Extracted Standings</h4>
                         </div>
-                        <div id="groups-container" class="space-y-4 max-h-60 overflow-y-auto pr-1"></div>
+                        <!-- Removed max-h-60 and inner overflow scroll so standings strictly follow main modal view -->
+                        <div id="groups-container" class="space-y-4"></div>
                     </div>
                 </div>
             </div>
@@ -562,13 +576,17 @@
             }
         }
 
-        // Modal Controls
+        // Modal Controls & File Upload / Camera Handlers
         const btnNewGame = document.getElementById('btn-new-game');
         const modalUpload = document.getElementById('modal-upload');
         const btnCloseModal = document.getElementById('btn-close-modal');
         const btnModalCancel = document.getElementById('btn-modal-cancel');
-        const dropZone = document.getElementById('drop-zone');
+        
+        const btnTriggerUpload = document.getElementById('btn-trigger-upload');
+        const btnTriggerCamera = document.getElementById('btn-trigger-camera');
         const inputPhoto = document.getElementById('input-photo');
+        const inputCamera = document.getElementById('input-camera');
+
         const step1 = document.getElementById('step-1-upload');
         const step2 = document.getElementById('step-2-annotate');
         const btnSaveGame = document.getElementById('btn-save-game');
@@ -596,6 +614,7 @@
             currentImageDataUrl = '';
             tableRegion = null;
             inputPhoto.value = '';
+            inputCamera.value = '';
             setDefaultDate();
             extractedGroups = [{
                 groupName: "Group 1",
@@ -607,8 +626,14 @@
             renderGroups();
         }
 
-        dropZone.addEventListener('click', () => inputPhoto.click());
+        // Feature 1: Explicit trigger support for file upload & direct camera photo capture
+        btnTriggerUpload.addEventListener('click', () => inputPhoto.click());
+        btnTriggerCamera.addEventListener('click', () => inputCamera.click());
+
         inputPhoto.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) handleFileUpload(e.target.files[0]);
+        });
+        inputCamera.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) handleFileUpload(e.target.files[0]);
         });
 
@@ -690,6 +715,11 @@
                 const h = Math.abs(c.y - startY);
                 if (w > 15 && h > 15) {
                     tableRegion = { x: Math.min(startX, c.x), y: Math.min(startY, c.y), w, h };
+                    
+                    // Feature 2: Scroll window automatically to 'Extract Names & Scores' button when crop is completed
+                    setTimeout(() => {
+                        btnOcrScan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 50);
                 }
                 drawCanvas();
             };
@@ -706,86 +736,82 @@
         btnResetBox.addEventListener('click', () => { tableRegion = null; drawCanvas(); });
 
         btnOcrScan.addEventListener('click', async () => {
-    ocrStatus.classList.remove('hidden');
-    btnOcrScan.disabled = true;
+            ocrStatus.classList.remove('hidden');
+            btnOcrScan.disabled = true;
 
-    try {
-        let cropCanvas = document.createElement('canvas');
-        let cropCtx = cropCanvas.getContext('2d');
+            try {
+                let cropCanvas = document.createElement('canvas');
+                let cropCtx = cropCanvas.getContext('2d');
 
-        // Extract selected region or full canvas
-        if (tableRegion && tableRegion.w > 0 && tableRegion.h > 0) {
-            cropCanvas.width = tableRegion.w;
-            cropCanvas.height = tableRegion.h;
-            cropCtx.drawImage(canvas, tableRegion.x, tableRegion.y, tableRegion.w, tableRegion.h, 0, 0, tableRegion.w, tableRegion.h);
-        } else {
-            cropCanvas.width = canvas.width;
-            cropCanvas.height = canvas.height;
-            cropCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
-        }
+                if (tableRegion && tableRegion.w > 0 && tableRegion.h > 0) {
+                    cropCanvas.width = tableRegion.w;
+                    cropCanvas.height = tableRegion.h;
+                    cropCtx.drawImage(canvas, tableRegion.x, tableRegion.y, tableRegion.w, tableRegion.h, 0, 0, tableRegion.w, tableRegion.h);
+                } else {
+                    cropCanvas.width = canvas.width;
+                    cropCanvas.height = canvas.height;
+                    cropCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                }
 
-        // --- SPEED & QUALITY OPTIMIZATION: Rescale High-Res Images ---
-        const MAX_DIMENSION = 1600; // Ideal resolution for Gemini Vision OCR
-        let targetW = cropCanvas.width;
-        let targetH = cropCanvas.height;
+                const MAX_DIMENSION = 1600;
+                let targetW = cropCanvas.width;
+                let targetH = cropCanvas.height;
 
-        if (targetW > MAX_DIMENSION || targetH > MAX_DIMENSION) {
-            if (targetW > targetH) {
-                targetH = Math.round((targetH * MAX_DIMENSION) / targetW);
-                targetW = MAX_DIMENSION;
-            } else {
-                targetW = Math.round((targetW * MAX_DIMENSION) / targetH);
-                targetH = MAX_DIMENSION;
+                if (targetW > MAX_DIMENSION || targetH > MAX_DIMENSION) {
+                    if (targetW > targetH) {
+                        targetH = Math.round((targetH * MAX_DIMENSION) / targetW);
+                        targetW = MAX_DIMENSION;
+                    } else {
+                        targetW = Math.round((targetW * MAX_DIMENSION) / targetH);
+                        targetH = MAX_DIMENSION;
+                    }
+                }
+
+                let optimizedCanvas = document.createElement('canvas');
+                optimizedCanvas.width = targetW;
+                optimizedCanvas.height = targetH;
+                let optCtx = optimizedCanvas.getContext('2d');
+
+                optCtx.filter = 'contrast(1.2) brightness(1.02)';
+                optCtx.drawImage(cropCanvas, 0, 0, targetW, targetH);
+
+                const base64Data = optimizedCanvas.toDataURL('image/jpeg', 0.80).split(',')[1];
+                
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: "ocrScan",
+                        imageBase64: base64Data
+                    })
+                });
+
+                const resJson = await response.json();
+                if (!resJson || !resJson.success || !resJson.data) {
+                    throw new Error(resJson.error || "OCR scan failed.");
+                }
+
+                const candidates = resJson.data.candidates;
+                if (!candidates || !candidates[0]) throw new Error("No data returned from AI model.");
+
+                const jsonText = candidates[0].content.parts[0].text;
+                const parsed = JSON.parse(jsonText);
+                
+                extractedGroups = parsed.map(g => ({
+                    ...g,
+                    players: (g.players || []).map(p => ({
+                        ...p,
+                        name: (p.name || '').toUpperCase(),
+                        originalName: (p.name || '').toUpperCase()
+                    }))
+                }));
+                renderGroups();
+            } catch (err) {
+                alert("OCR Error: " + err.message);
+            } finally {
+                ocrStatus.classList.add('hidden');
+                btnOcrScan.disabled = false;
             }
-        }
-
-        let optimizedCanvas = document.createElement('canvas');
-        optimizedCanvas.width = targetW;
-        optimizedCanvas.height = targetH;
-        let optCtx = optimizedCanvas.getContext('2d');
-
-        // Apply visual filter to boost text legibility
-        optCtx.filter = 'contrast(1.2) brightness(1.02)';
-        optCtx.drawImage(cropCanvas, 0, 0, targetW, targetH);
-
-        // Compress image to 80% JPEG quality to optimize payload transfer speed
-        const base64Data = optimizedCanvas.toDataURL('image/jpeg', 0.80).split(',')[1];
-        
-        const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: "ocrScan",
-                imageBase64: base64Data
-            })
         });
-
-        const resJson = await response.json();
-        if (!resJson || !resJson.success || !resJson.data) {
-            throw new Error(resJson.error || "OCR scan failed.");
-        }
-
-        const candidates = resJson.data.candidates;
-        if (!candidates || !candidates[0]) throw new Error("No data returned from AI model.");
-
-        const jsonText = candidates[0].content.parts[0].text;
-        const parsed = JSON.parse(jsonText);
-        
-        extractedGroups = parsed.map(g => ({
-            ...g,
-            players: (g.players || []).map(p => ({
-                ...p,
-                name: (p.name || '').toUpperCase(),
-                originalName: (p.name || '').toUpperCase()
-            }))
-        }));
-        renderGroups();
-    } catch (err) {
-        alert("OCR Error: " + err.message);
-    } finally {
-        ocrStatus.classList.add('hidden');
-        btnOcrScan.disabled = false;
-    }
-});
 
         btnSaveGame.addEventListener('click', async () => {
             const dateVal = inputGameDate.value;
@@ -1045,118 +1071,118 @@
         }
 
         function renderGamesList() {
-    if (!gamesData || gamesData.length === 0) {
-        gamesList.innerHTML = `<div class="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg"><i data-lucide="image" class="w-10 h-10 mx-auto text-slate-300 mb-2"></i><p>No uploaded games yet</p></div>`;
-        lucide.createIcons();
-        return;
-    }
-
-    const filterVal = selectGameFilter.value || 'all';
-    const filteredGames = filterVal === 'all' 
-        ? gamesData 
-        : gamesData.filter(g => g.id === filterVal);
-
-    if (filteredGames.length === 0) {
-        gamesList.innerHTML = `<div class="text-center py-8 text-slate-400 border border-slate-200 rounded-lg"><p>No games found for this selection.</p></div>`;
-        return;
-    }
-
-    gamesList.innerHTML = '';
-    [...filteredGames].reverse().forEach((game) => {
-        const gameIndex = gamesData.findIndex(g => g.id === game.id);
-        const gameNum = gameIndex >= 0 ? gameIndex + 1 : 1;
-        
-        const sortedPlacements = [...(game.placements || [])].sort((a, b) => b.points - a.points);
-        
-        let currentRank = 1;
-        const placementsWithDynamicRank = sortedPlacements.map((p, idx, arr) => {
-            if (idx > 0 && p.points < arr[idx - 1].points) {
-                currentRank = idx + 1;
+            if (!gamesData || gamesData.length === 0) {
+                gamesList.innerHTML = `<div class="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg"><i data-lucide="image" class="w-10 h-10 mx-auto text-slate-300 mb-2"></i><p>No uploaded games yet</p></div>`;
+                lucide.createIcons();
+                return;
             }
-            return { ...p, dynamicRank: currentRank };
-        });
 
-        const deleteGameBtn = isEditMode ? `
-            <button onclick="confirmDeleteGame('${game.id}', ${gameNum})" title="Delete Game" class="text-slate-400 hover:text-red-600 p-1 rounded transition flex items-center gap-1">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
-        ` : '';
+            const filterVal = selectGameFilter.value || 'all';
+            const filteredGames = filterVal === 'all' 
+                ? gamesData 
+                : gamesData.filter(g => g.id === filterVal);
 
-        const div = document.createElement('div');
-        div.className = 'border border-slate-200 rounded-xl p-3 bg-white space-y-2';
-        
-        div.innerHTML = `
-            <div class="flex justify-between items-center text-xs border-b pb-1.5 mb-2">
-                <div class="flex items-center gap-2">
-                    <span class="font-bold text-emerald-700">Game ${gameNum}</span>
-                    ${deleteGameBtn}
-                </div>
-                <span class="text-slate-400">${game.date}</span>
-            </div>
-            <div class="grid grid-cols-12 gap-3 items-start">
-                <div class="col-span-4 relative group cursor-pointer" onclick="openPhotoModal('${game.photoUrl}')" title="Click to view full image">
-                    <img src="${game.photoUrl}" alt="Scorecard photo" class="w-full h-24 object-cover rounded-lg border border-slate-200 group-hover:opacity-90 transition">
-                    <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center text-white text-[11px] font-semibold gap-1">
-                        <i data-lucide="zoom-in" class="w-4 h-4"></i> View
+            if (filteredGames.length === 0) {
+                gamesList.innerHTML = `<div class="text-center py-8 text-slate-400 border border-slate-200 rounded-lg"><p>No games found for this selection.</p></div>`;
+                return;
+            }
+
+            gamesList.innerHTML = '';
+            [...filteredGames].reverse().forEach((game) => {
+                const gameIndex = gamesData.findIndex(g => g.id === game.id);
+                const gameNum = gameIndex >= 0 ? gameIndex + 1 : 1;
+                
+                const sortedPlacements = [...(game.placements || [])].sort((a, b) => b.points - a.points);
+                
+                let currentRank = 1;
+                const placementsWithDynamicRank = sortedPlacements.map((p, idx, arr) => {
+                    if (idx > 0 && p.points < arr[idx - 1].points) {
+                        currentRank = idx + 1;
+                    }
+                    return { ...p, dynamicRank: currentRank };
+                });
+
+                const deleteGameBtn = isEditMode ? `
+                    <button onclick="confirmDeleteGame('${game.id}', ${gameNum})" title="Delete Game" class="text-slate-400 hover:text-red-600 p-1 rounded transition flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                ` : '';
+
+                const div = document.createElement('div');
+                div.className = 'border border-slate-200 rounded-xl p-3 bg-white space-y-2';
+                
+                div.innerHTML = `
+                    <div class="flex justify-between items-center text-xs border-b pb-1.5 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-emerald-700">Game ${gameNum}</span>
+                            ${deleteGameBtn}
+                        </div>
+                        <span class="text-slate-400">${game.date}</span>
                     </div>
-                </div>
-                <div class="col-span-8 text-xs space-y-1.5">
-                    ${placementsWithDynamicRank.map(p => {
-                        const upperName = (p.name || '').toUpperCase();
-                        const originalExtractedName = (p.originalName || p.name || '').toUpperCase();
-                        const originalPointsVal = p.originalPoints !== undefined ? p.originalPoints : p.points;
-                        const safeName = upperName.replace(/'/g, "\\'");
-                        const safeOriginalName = originalExtractedName.replace(/'/g, "\\'");
-                        
-                        const isRankEdited = !!p.isRankEdited || p.dynamicRank !== p.place;
-                        const isNameEdited = !!p.isNameEdited;
-                        const isPointsEdited = !!p.isPointsEdited || !!p.isEdited;
-
-                        const rankStyle = isRankEdited 
-                            ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1 rounded font-bold' 
-                            : 'font-bold text-slate-400';
-
-                        const nameStyle = isNameEdited 
-                            ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1 rounded font-bold' 
-                            : 'font-bold text-slate-700';
-
-                        const pointsStyle = isPointsEdited 
-                            ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1.5 py-0.5 rounded font-bold' 
-                            : 'text-emerald-600 font-bold';
-
-                        const editPlayerBtn = isEditMode ? `
-                            <button onclick="openEditPlayerModal('${game.id}', '${safeName}', '${safeOriginalName}')" title="Edit player name in this game only" class="text-slate-400 hover:text-indigo-600 p-0.5 rounded">
-                                <i data-lucide="edit-2" class="w-3 h-3"></i>
-                            </button>
-                        ` : '';
-
-                        const editScoreBtn = isEditMode ? `
-                            <button onclick="openEditScoreModal('${game.id}', '${safeName}', 'Game ${gameNum}', ${p.points}, ${originalPointsVal})" title="Edit score" class="text-slate-400 hover:text-amber-600 p-0.5 rounded">
-                                <i data-lucide="edit-3" class="w-3 h-3"></i>
-                            </button>
-                        ` : '';
-
-                        return `
-                            <div class="flex items-center justify-between bg-slate-50 p-1.5 rounded-md border border-slate-100 gap-1">
-                                <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                                    <span class="text-[11px] ${rankStyle}">#${p.dynamicRank}</span>
-                                    <span class="uppercase truncate ${nameStyle}">${upperName}</span>
-                                    ${editPlayerBtn}
-                                </div>
-                                <div class="flex items-center gap-1 shrink-0">
-                                    <span class="${pointsStyle}">+${p.points} pts</span>
-                                    ${editScoreBtn}
-                                </div>
+                    <div class="grid grid-cols-12 gap-3 items-start">
+                        <div class="col-span-4 relative group cursor-pointer" onclick="openPhotoModal('${game.photoUrl}')" title="Click to view full image">
+                            <img src="${game.photoUrl}" alt="Scorecard photo" class="w-full h-24 object-cover rounded-lg border border-slate-200 group-hover:opacity-90 transition">
+                            <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center text-white text-[11px] font-semibold gap-1">
+                                <i data-lucide="zoom-in" class="w-4 h-4"></i> View
                             </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-        gamesList.appendChild(div);
-    });
-    lucide.createIcons();
-}
+                        </div>
+                        <div class="col-span-8 text-xs space-y-1.5">
+                            ${placementsWithDynamicRank.map(p => {
+                                const upperName = (p.name || '').toUpperCase();
+                                const originalExtractedName = (p.originalName || p.name || '').toUpperCase();
+                                const originalPointsVal = p.originalPoints !== undefined ? p.originalPoints : p.points;
+                                const safeName = upperName.replace(/'/g, "\\'");
+                                const safeOriginalName = originalExtractedName.replace(/'/g, "\\'");
+                                
+                                const isRankEdited = !!p.isRankEdited || p.dynamicRank !== p.place;
+                                const isNameEdited = !!p.isNameEdited;
+                                const isPointsEdited = !!p.isPointsEdited || !!p.isEdited;
+
+                                const rankStyle = isRankEdited 
+                                    ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1 rounded font-bold' 
+                                    : 'font-bold text-slate-400';
+
+                                const nameStyle = isNameEdited 
+                                    ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1 rounded font-bold' 
+                                    : 'font-bold text-slate-700';
+
+                                const pointsStyle = isPointsEdited 
+                                    ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1.5 py-0.5 rounded font-bold' 
+                                    : 'text-emerald-600 font-bold';
+
+                                const editPlayerBtn = isEditMode ? `
+                                    <button onclick="openEditPlayerModal('${game.id}', '${safeName}', '${safeOriginalName}')" title="Edit player name in this game only" class="text-slate-400 hover:text-indigo-600 p-0.5 rounded">
+                                        <i data-lucide="edit-2" class="w-3 h-3"></i>
+                                    </button>
+                                ` : '';
+
+                                const editScoreBtn = isEditMode ? `
+                                    <button onclick="openEditScoreModal('${game.id}', '${safeName}', 'Game ${gameNum}', ${p.points}, ${originalPointsVal})" title="Edit score" class="text-slate-400 hover:text-amber-600 p-0.5 rounded">
+                                        <i data-lucide="edit-3" class="w-3 h-3"></i>
+                                    </button>
+                                ` : '';
+
+                                return `
+                                    <div class="flex items-center justify-between bg-slate-50 p-1.5 rounded-md border border-slate-100 gap-1">
+                                        <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                            <span class="text-[11px] ${rankStyle}">#${p.dynamicRank}</span>
+                                            <span class="uppercase truncate ${nameStyle}">${upperName}</span>
+                                            ${editPlayerBtn}
+                                        </div>
+                                        <div class="flex items-center gap-1 shrink-0">
+                                            <span class="${pointsStyle}">+${p.points} pts</span>
+                                            ${editScoreBtn}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+                gamesList.appendChild(div);
+            });
+            lucide.createIcons();
+        }
 
         const modalEditPlayer = document.getElementById('modal-edit-player');
         const modalEditScore = document.getElementById('modal-edit-score');
@@ -1290,16 +1316,15 @@
         document.getElementById('btn-close-score-modal').addEventListener('click', () => modalEditScore.classList.add('hidden'));
         document.getElementById('btn-cancel-score').addEventListener('click', () => modalEditScore.classList.add('hidden'));
 
-function confirmDeleteGame(gameId, gameNum) {
-    confirmPopupText.innerHTML = `Are you sure you want to permanently delete <strong>Game ${gameNum}</strong>? This will recalculate the entire leaderboard.`;
-    pendingAction = () => {
-        gamesData = gamesData.filter(g => g.id !== gameId);
-        syncCloudData();
-        renderAll();
-    };
-    modalConfirmPopup.classList.remove('hidden');
-}
-
+        function confirmDeleteGame(gameId, gameNum) {
+            confirmPopupText.innerHTML = `Are you sure you want to permanently delete <strong>Game ${gameNum}</strong>? This will recalculate the entire leaderboard.`;
+            pendingAction = () => {
+                gamesData = gamesData.filter(g => g.id !== gameId);
+                syncCloudData();
+                renderAll();
+            };
+            modalConfirmPopup.classList.remove('hidden');
+        }
     </script>
 </body>
 </html>
