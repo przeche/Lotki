@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Badminton Game Statistics Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .touch-none { touch-action: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <div class="p-2 bg-emerald-500 rounded-lg text-white">
+                    <i data-lucide="trophy" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold tracking-tight">ShuttleStat</h1>
+                    <p class="text-[10px] sm:text-xs text-emerald-100">Badminton Cloud Scorecard & Leaderboard</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="sync-indicator" class="text-xs bg-emerald-700/60 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                    <span id="sync-status-text">Cloud Active</span>
+                </span>
+                
+                <button id="btn-toggle-edit" class="bg-emerald-700/80 hover:bg-emerald-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition">
+                    <i id="icon-edit-mode" data-lucide="lock" class="w-4 h-4"></i>
+                    <span id="text-edit-mode">Edit Mode</span>
+                </button>
+
+                <button id="btn-new-game" class="bg-white text-emerald-700 hover:bg-emerald-50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>Upload Scorecard</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <section class="lg:col-span-12 flex flex-col space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white flex-wrap gap-2">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="award" class="w-5 h-5 text-emerald-600"></i>
+                        <h2 class="font-bold text-slate-800 text-base sm:text-lg">Overall Leaderboard & Matrix</h2>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs sm:text-sm whitespace-nowrap">
+                        <thead id="leaderboard-head" class="bg-slate-50 text-slate-500 font-medium border-b border-slate-200"></thead>
+                        <tbody id="leaderboard-body" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-slate-400">
+                                    Loading live stats...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="lg:col-span-7 flex flex-col space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="history" class="w-5 h-5 text-emerald-600"></i>
+                        <h2 class="font-bold text-slate-800 text-base sm:text-lg">Consolidated Games</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="select-game-filter" class="text-xs text-slate-500 font-semibold">View:</label>
+                        <select id="select-game-filter" class="text-xs border border-slate-300 rounded-lg px-2 py-1 bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="all">All Games</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="games-list" class="space-y-4 h-[600px] overflow-y-auto custom-scrollbar pr-1">
+                    <div class="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
+                        <i data-lucide="image" class="w-10 h-10 mx-auto text-slate-300 mb-2"></i>
+                        <p>No uploaded games yet</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="lg:col-span-5 flex flex-col space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
+                <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                    <i data-lucide="info" class="w-4 h-4 text-emerald-600"></i>
+                    Rules & System Access
+                </h3>
+                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs space-y-2 text-slate-700">
+                    <p class="font-semibold text-slate-800">1. Site Access & Edit Mode:</p>
+                    <p class="text-[11px] text-slate-600">Site access is password protected upon opening. Turn on 'Edit Mode' using password authorization to show edit controls and modify game entries seamlessly.</p>
+                    
+                    <p class="font-semibold text-slate-800 pt-1 border-t border-slate-200">2. Points Assignment Rules:</p>
+                    <p class="text-[11px] text-slate-600">Points are automatically assigned to players based on their placement in extracted scorecard data:</p>
+                    <ul class="list-disc list-inside text-[11px] text-slate-600 space-y-0.5 pl-1">
+                        <li><strong>1st Place:</strong> Earns maximum points equal to total group/session players.</li>
+                        <li><strong>Descending Scale:</strong> Each subsequent placement earns 1 point less down to a minimum of 1 point.</li>
+                        <li><strong>Tie-Breaker:</strong> Ties in ranking are resolved by total sets won.</li>
+                    </ul>
+
+                    <p class="font-semibold text-slate-800 pt-1 border-t border-slate-200">3. Isolated Game Editing:</p>
+                    <p class="text-[11px] text-slate-600">Player names are restricted per game session. Editing a name in Game 1 will only affect Game 1 and will not overwrite the same player in other games.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Site Password Lock Modal -->
+    <div id="modal-site-password" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <i data-lucide="lock" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Protected Access</h3>
+                <p class="text-xs text-slate-500 mt-1">Please enter password to access the application.</p>
+            </div>
+            <input type="password" id="site-password-input" placeholder="Enter password" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-center">
+            <div id="site-password-error" class="text-xs font-semibold text-red-600 hidden">Incorrect password!</div>
+            <button id="btn-site-login" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg shadow transition">Unlock Application</button>
+        </div>
+    </div>
+
+    <!-- Edit Mode Password Activation Modal -->
+    <div id="modal-edit-mode-password" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                <i data-lucide="key" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Enable Edit Mode</h3>
+                <p class="text-xs text-slate-500 mt-1">Enter edit password to activate game modifications.</p>
+            </div>
+            <input type="password" id="edit-mode-password-input" placeholder="Enter password" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none text-center">
+            <div id="edit-mode-password-error" class="text-xs font-semibold text-red-600 hidden">Incorrect password!</div>
+            <div class="flex gap-2">
+                <button id="btn-cancel-edit-mode" class="w-1/2 py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-lg">Cancel</button>
+                <button id="btn-submit-edit-mode" class="w-1/2 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow">Unlock Edits</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Scorecard Modal -->
+    <div id="modal-upload" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-2 sm:p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden">
+            <div class="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="camera" class="w-5 h-5 text-emerald-600"></i>
+                    <h3 class="font-bold text-slate-800 text-base sm:text-lg">Upload Scorecard</h3>
+                </div>
+                <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-3 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
+                <div id="step-1-upload" class="space-y-4">
+                    <div id="drop-zone" class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl p-6 sm:p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[200px]">
+                        <input type="file" id="input-photo" accept="image/*" class="hidden">
+                        <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
+                            <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700">Tap to upload or take game scorecard photo</p>
+                    </div>
+                </div>
+
+                <div id="step-2-annotate" class="hidden space-y-4">
+                    <div class="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-3 rounded-xl text-xs text-indigo-800">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="bounding-box" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+                            <span>Drag across the image to crop the scorecard area.</span>
+                        </div>
+                        <button id="btn-reset-box" class="text-[11px] font-semibold text-indigo-600 hover:underline">Reset</button>
+                    </div>
+
+                    <div class="relative w-full overflow-hidden border border-slate-200 rounded-xl bg-slate-900 flex justify-center items-center min-h-[220px]">
+                        <div id="canvas-container" class="relative inline-block select-none touch-none">
+                            <canvas id="annotation-canvas" class="max-w-full h-auto block cursor-crosshair touch-none"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-center">
+                            <button id="btn-ocr-scan" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                                <i data-lucide="sparkles" class="w-4 h-4 text-yellow-300"></i>
+                                <span>Extract Names & Scores</span>
+                            </button>
+                        </div>
+                        <div id="ocr-status" class="text-center text-xs text-indigo-600 font-semibold hidden flex items-center justify-center gap-2">
+                            <div class="w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Scanning scorecard table...</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Date Photo Taken</label>
+                        <input type="date" id="input-game-date" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-bold text-xs sm:text-sm text-slate-800">Extracted Standings</h4>
+                        </div>
+                        <div id="groups-container" class="space-y-4 max-h-60 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                <button id="btn-modal-cancel" class="px-3 py-1.5 text-xs text-slate-600 font-semibold">Cancel</button>
+                <button id="btn-save-game" class="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-sm transition hidden">
+                    Save to Central Storage
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Lightbox Modal -->
+    <div id="modal-image-view" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden" onclick="closePhotoModal()">
+        <div class="relative max-w-4xl max-h-[90vh] bg-slate-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col items-center justify-center border border-slate-700" onclick="event.stopPropagation()">
+            <button onclick="closePhotoModal()" class="absolute top-3 right-3 bg-slate-800/80 hover:bg-slate-700 text-white p-2 rounded-full z-10 transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <img id="modal-preview-img" src="" class="max-w-full max-h-[80vh] object-contain p-2">
+            <div class="p-3 bg-slate-800 text-white text-xs w-full flex justify-between items-center border-t border-slate-700 px-4">
+                <span class="font-semibold text-slate-300">Scorecard Photo Preview</span>
+                <a id="modal-preview-link" href="#" target="_blank" class="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open Full Image
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Player Name Modal -->
+    <div id="modal-edit-player" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-base">Edit Player Name (This Game Only)</h3>
+                <button id="btn-close-edit-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Original Name (Extracted)</label>
+                    <input type="text" id="edit-original-name" readonly class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-500 uppercase">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Current Name</label>
+                    <input type="text" id="edit-old-name" readonly class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-600 uppercase">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">New Player Name</label>
+                    <input type="text" id="edit-new-name" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-semibold">
+                </div>
+                <div id="container-edit-player-password">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Security Password</label>
+                    <input type="password" id="edit-password" placeholder="Enter password" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2">
+                <button id="btn-cancel-edit" class="px-4 py-2 text-xs font-semibold text-slate-600">Cancel</button>
+                <button id="btn-confirm-edit" class="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded-lg">Save & Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Score Modal -->
+    <div id="modal-edit-score" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-base">Modify Points for Game Score</h3>
+                <button id="btn-close-score-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Player Name</label>
+                    <input type="text" id="score-player-name" readonly class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-600 uppercase">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Game Context</label>
+                    <input type="text" id="score-game-label" readonly class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Original Points Value (Extracted)</label>
+                    <input type="text" id="score-original-points" readonly class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">New Points Value</label>
+                    <input type="number" min="0" id="score-new-points" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div id="container-edit-score-password">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Security Password</label>
+                    <input type="password" id="score-password" placeholder="Enter password" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2">
+                <button id="btn-cancel-score" class="px-4 py-2 text-xs font-semibold text-slate-600">Cancel</button>
+                <button id="btn-confirm-score" class="px-4 py-2 text-xs font-bold bg-amber-600 text-white rounded-lg">Save Score</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Dialog Popup -->
+    <div id="modal-confirm-popup" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center space-y-4">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-lg">Confirm Action</h3>
+            <p id="confirm-popup-text" class="text-xs text-slate-600">Are you sure?</p>
+            <div class="flex items-center justify-center gap-3 pt-2">
+                <button id="btn-popup-no" class="w-1/2 py-2 text-xs font-semibold bg-slate-100 rounded-lg">No, Cancel</button>
+                <button id="btn-popup-yes" class="w-1/2 py-2 text-xs font-bold bg-emerald-600 text-white rounded-lg">Yes, Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURATION
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKP3_l8n09LbdhbNVfBDGVSDFdSbk3iUnFKmT3Ftl6imVwo4X-aAxuwLrVhL1013l9nQ/exec";
+
+        let currentAccessPassword = "";
+        let isEditMode = false;
+        let gamesData = [];
+        let currentImageObj = null;
+        let currentImageDataUrl = '';
+        let tableRegion = null;
+        let isDrawing = false;
+        let startX = 0, startY = 0;
+        
+        let editingPlayerTargetGameId = null;
+        let editingPlayerOldName = "";
+        let editingScoreTarget = null;
+        let pendingAction = null;
+
+        let extractedGroups = [
+            {
+                groupName: "Group 1",
+                players: [
+                    { place: 1, name: "PLAYER 1", setsWon: 2, points: 2, originalPoints: 2 },
+                    { place: 2, name: "PLAYER 2", setsWon: 1, points: 1, originalPoints: 1 }
+                ]
+            }
+        ];
+
+        // Password & Access Gate Elements
+        const modalSitePassword = document.getElementById('modal-site-password');
+        const sitePasswordInput = document.getElementById('site-password-input');
+        const btnSiteLogin = document.getElementById('btn-site-login');
+        const sitePasswordError = document.getElementById('site-password-error');
+        const selectGameFilter = document.getElementById('select-game-filter');
+        const gamesList = document.getElementById('games-list');
+
+        // Edit Mode Elements
+        const btnToggleEdit = document.getElementById('btn-toggle-edit');
+        const iconEditMode = document.getElementById('icon-edit-mode');
+        const textEditMode = document.getElementById('text-edit-mode');
+        const modalEditModePassword = document.getElementById('modal-edit-mode-password');
+        const editModePasswordInput = document.getElementById('edit-mode-password-input');
+        const editModePasswordError = document.getElementById('edit-mode-password-error');
+        const btnSubmitEditMode = document.getElementById('btn-submit-edit-mode');
+        const btnCancelEditMode = document.getElementById('btn-cancel-edit-mode');
+
+        btnSiteLogin.addEventListener('click', checkSiteAccess);
+        sitePasswordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') checkSiteAccess(); });
+
+        async function checkSiteAccess() {
+            const pwd = sitePasswordInput.value.trim();
+            if (!pwd) return;
+            btnSiteLogin.disabled = true;
+            try {
+                const res = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "verifyAccessPassword", password: pwd })
+                });
+                const json = await res.json();
+                if (json && json.success) {
+                    currentAccessPassword = pwd;
+                    modalSitePassword.classList.add('hidden');
+                    sitePasswordError.classList.add('hidden');
+                    fetchCloudData();
+                } else {
+                    sitePasswordError.classList.remove('hidden');
+                }
+            } catch (e) {
+                sitePasswordError.classList.remove('hidden');
+            } finally {
+                btnSiteLogin.disabled = false;
+            }
+        }
+
+        btnToggleEdit.addEventListener('click', () => {
+            if (isEditMode) {
+                isEditMode = false;
+                updateEditModeUI();
+                renderGamesList();
+            } else {
+                editModePasswordInput.value = '';
+                editModePasswordError.classList.add('hidden');
+                modalEditModePassword.classList.remove('hidden');
+                editModePasswordInput.focus();
+            }
+        });
+
+        btnCancelEditMode.addEventListener('click', () => {
+            modalEditModePassword.classList.add('hidden');
+        });
+
+        btnSubmitEditMode.addEventListener('click', submitEditModePassword);
+        editModePasswordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') submitEditModePassword(); });
+
+        async function submitEditModePassword() {
+            const pwd = editModePasswordInput.value.trim();
+            if (!pwd) return;
+            btnSubmitEditMode.disabled = true;
+            try {
+                const res = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "verifyEditPassword", password: pwd })
+                });
+                const json = await res.json();
+                if (json && json.success) {
+                    isEditMode = true;
+                    modalEditModePassword.classList.add('hidden');
+                    updateEditModeUI();
+                    renderGamesList();
+                } else {
+                    editModePasswordError.classList.remove('hidden');
+                }
+            } catch (e) {
+                editModePasswordError.classList.remove('hidden');
+            } finally {
+                btnSubmitEditMode.disabled = false;
+            }
+        }
+
+        function updateEditModeUI() {
+            if (isEditMode) {
+                btnToggleEdit.className = 'bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition ring-2 ring-amber-300';
+                textEditMode.textContent = 'Edit Mode ON';
+                iconEditMode.setAttribute('data-lucide', 'unlock');
+            } else {
+                btnToggleEdit.className = 'bg-emerald-700/80 hover:bg-emerald-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition';
+                textEditMode.textContent = 'Edit Mode';
+                iconEditMode.setAttribute('data-lucide', 'lock');
+            }
+            lucide.createIcons();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            modalSitePassword.classList.remove('hidden');
+            attachCanvasPointerEvents();
+            setDefaultDate();
+            
+            selectGameFilter.addEventListener('change', () => {
+                const pageY = window.scrollY || window.pageYOffset;
+                const listScroll = gamesList.scrollTop;
+                renderGamesList();
+                window.scrollTo(0, pageY);
+                gamesList.scrollTop = listScroll;
+            });
+        });
+
+        async function fetchCloudData() {
+            try {
+                if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("PASTE_YOUR")) {
+                    loadFromLocalStorage();
+                    return;
+                }
+
+                const res = await fetch(APPS_SCRIPT_URL);
+                const json = await res.json();
+                if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    gamesData = json.data;
+                    saveToLocalStorage();
+                } else if (Array.isArray(json) && json.length > 0) {
+                    gamesData = json;
+                    saveToLocalStorage();
+                } else {
+                    loadFromLocalStorage();
+                }
+            } catch (err) {
+                loadFromLocalStorage();
+            } finally {
+                renderAll();
+            }
+        }
+
+        async function syncCloudData() {
+            saveToLocalStorage();
+            if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("PASTE_YOUR")) return;
+
+            try {
+                await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        password: currentAccessPassword,
+                        action: "sync",
+                        data: gamesData
+                    })
+                });
+            } catch (e) {}
+        }
+
+        async function uploadGameToCloud(gameRecord, base64Img) {
+            gamesData.push(gameRecord);
+            saveToLocalStorage();
+            renderAll();
+
+            if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("PASTE_YOUR")) return;
+
+            try {
+                const res = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        password: currentAccessPassword,
+                        action: "uploadGame",
+                        gameRecord: gameRecord,
+                        imageBase64: base64Img ? base64Img.split(',')[1] || '' : '',
+                        mimeType: 'image/jpeg'
+                    })
+                });
+                const json = await res.json();
+                if (json && json.success && Array.isArray(json.data)) {
+                    gamesData = json.data;
+                    saveToLocalStorage();
+                    renderAll();
+                }
+            } catch (err) {
+                console.warn("Cloud upload sync failed, kept local copy:", err);
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('shuttle_stat_games_v3', JSON.stringify(gamesData));
+        }
+
+        function loadFromLocalStorage() {
+            const stored = localStorage.getItem('shuttle_stat_games_v3');
+            if (stored) {
+                try {
+                    gamesData = JSON.parse(stored);
+                } catch (e) {
+                    gamesData = [];
+                }
+            }
+        }
+
+        // Modal Controls
+        const btnNewGame = document.getElementById('btn-new-game');
+        const modalUpload = document.getElementById('modal-upload');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+        const btnModalCancel = document.getElementById('btn-modal-cancel');
+        const dropZone = document.getElementById('drop-zone');
+        const inputPhoto = document.getElementById('input-photo');
+        const step1 = document.getElementById('step-1-upload');
+        const step2 = document.getElementById('step-2-annotate');
+        const btnSaveGame = document.getElementById('btn-save-game');
+
+        const canvas = document.getElementById('annotation-canvas');
+        const ctx = canvas.getContext('2d');
+        const btnResetBox = document.getElementById('btn-reset-box');
+        const btnOcrScan = document.getElementById('btn-ocr-scan');
+        const ocrStatus = document.getElementById('ocr-status');
+
+        const inputGameDate = document.getElementById('input-game-date');
+        const groupsContainer = document.getElementById('groups-container');
+
+        btnNewGame.addEventListener('click', () => { resetModalState(); modalUpload.classList.remove('hidden'); });
+        btnCloseModal.addEventListener('click', () => modalUpload.classList.add('hidden'));
+        btnModalCancel.addEventListener('click', () => modalUpload.classList.add('hidden'));
+
+        function setDefaultDate() { inputGameDate.value = new Date().toISOString().split('T')[0]; }
+
+        function resetModalState() {
+            step1.classList.remove('hidden');
+            step2.classList.add('hidden');
+            btnSaveGame.classList.add('hidden');
+            currentImageObj = null;
+            currentImageDataUrl = '';
+            tableRegion = null;
+            inputPhoto.value = '';
+            setDefaultDate();
+            extractedGroups = [{
+                groupName: "Group 1",
+                players: [
+                    { place: 1, name: "PLAYER 1", setsWon: 2, points: 2, originalPoints: 2 },
+                    { place: 2, name: "PLAYER 2", setsWon: 1, points: 1, originalPoints: 1 }
+                ]
+            }];
+            renderGroups();
+        }
+
+        dropZone.addEventListener('click', () => inputPhoto.click());
+        inputPhoto.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) handleFileUpload(e.target.files[0]);
+        });
+
+        function handleFileUpload(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                currentImageDataUrl = event.target.result;
+                const img = new Image();
+                img.onload = () => {
+                    currentImageObj = img;
+                    setupCanvas();
+                    step1.classList.add('hidden');
+                    step2.classList.remove('hidden');
+                    btnSaveGame.classList.remove('hidden');
+                };
+                img.src = currentImageDataUrl;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setupCanvas() {
+            const containerWidth = Math.min(window.innerWidth - 48, 650);
+            let width = currentImageObj.width;
+            let height = currentImageObj.height;
+            if (width > containerWidth) {
+                height = (containerWidth / width) * height;
+                width = containerWidth;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            drawCanvas();
+        }
+
+        function drawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(currentImageObj, 0, 0, canvas.width, canvas.height);
+            if (tableRegion) {
+                ctx.strokeStyle = '#4f46e5';
+                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(79, 70, 229, 0.2)';
+                ctx.fillRect(tableRegion.x, tableRegion.y, tableRegion.w, tableRegion.h);
+                ctx.strokeRect(tableRegion.x, tableRegion.y, tableRegion.w, tableRegion.h);
+            }
+        }
+
+        function attachCanvasPointerEvents() {
+            const getCoords = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches && e.touches.length > 0 ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+                return {
+                    x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                    y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+                };
+            };
+
+            const handleStart = (e) => {
+                if (e.type.startsWith('touch')) e.preventDefault();
+                const c = getCoords(e);
+                startX = c.x; 
+                startY = c.y; 
+                isDrawing = true;
+            };
+
+            const handleMove = (e) => {
+                if (!isDrawing) return;
+                if (e.type.startsWith('touch')) e.preventDefault();
+                const c = getCoords(e);
+                drawCanvas();
+                ctx.strokeStyle = '#4f46e5';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(Math.min(startX, c.x), Math.min(startY, c.y), Math.abs(c.x - startX), Math.abs(c.y - startY));
+            };
+
+            const handleEnd = (e) => {
+                if (!isDrawing) return;
+                isDrawing = false;
+                const c = getCoords(e);
+                const w = Math.abs(c.x - startX);
+                const h = Math.abs(c.y - startY);
+                if (w > 15 && h > 15) {
+                    tableRegion = { x: Math.min(startX, c.x), y: Math.min(startY, c.y), w, h };
+                }
+                drawCanvas();
+            };
+
+            canvas.addEventListener('mousedown', handleStart);
+            canvas.addEventListener('mousemove', handleMove);
+            canvas.addEventListener('mouseup', handleEnd);
+
+            canvas.addEventListener('touchstart', handleStart, { passive: false });
+            canvas.addEventListener('touchmove', handleMove, { passive: false });
+            canvas.addEventListener('touchend', handleEnd);
+        }
+
+        btnResetBox.addEventListener('click', () => { tableRegion = null; drawCanvas(); });
+
+        btnOcrScan.addEventListener('click', async () => {
+    ocrStatus.classList.remove('hidden');
+    btnOcrScan.disabled = true;
+
+    try {
+        let cropCanvas = document.createElement('canvas');
+        let cropCtx = cropCanvas.getContext('2d');
+
+        // Extract selected region or full canvas
+        if (tableRegion && tableRegion.w > 0 && tableRegion.h > 0) {
+            cropCanvas.width = tableRegion.w;
+            cropCanvas.height = tableRegion.h;
+            cropCtx.drawImage(canvas, tableRegion.x, tableRegion.y, tableRegion.w, tableRegion.h, 0, 0, tableRegion.w, tableRegion.h);
+        } else {
+            cropCanvas.width = canvas.width;
+            cropCanvas.height = canvas.height;
+            cropCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+        }
+
+        // --- SPEED & QUALITY OPTIMIZATION: Rescale High-Res Images ---
+        const MAX_DIMENSION = 1600; // Ideal resolution for Gemini Vision OCR
+        let targetW = cropCanvas.width;
+        let targetH = cropCanvas.height;
+
+        if (targetW > MAX_DIMENSION || targetH > MAX_DIMENSION) {
+            if (targetW > targetH) {
+                targetH = Math.round((targetH * MAX_DIMENSION) / targetW);
+                targetW = MAX_DIMENSION;
+            } else {
+                targetW = Math.round((targetW * MAX_DIMENSION) / targetH);
+                targetH = MAX_DIMENSION;
+            }
+        }
+
+        let optimizedCanvas = document.createElement('canvas');
+        optimizedCanvas.width = targetW;
+        optimizedCanvas.height = targetH;
+        let optCtx = optimizedCanvas.getContext('2d');
+
+        // Apply visual filter to boost text legibility
+        optCtx.filter = 'contrast(1.2) brightness(1.02)';
+        optCtx.drawImage(cropCanvas, 0, 0, targetW, targetH);
+
+        // Compress image to 80% JPEG quality to optimize payload transfer speed
+        const base64Data = optimizedCanvas.toDataURL('image/jpeg', 0.80).split(',')[1];
+        
+        const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: "ocrScan",
+                imageBase64: base64Data
+            })
+        });
+
+        const resJson = await response.json();
+        if (!resJson || !resJson.success || !resJson.data) {
+            throw new Error(resJson.error || "OCR scan failed.");
+        }
+
+        const candidates = resJson.data.candidates;
+        if (!candidates || !candidates[0]) throw new Error("No data returned from AI model.");
+
+        const jsonText = candidates[0].content.parts[0].text;
+        const parsed = JSON.parse(jsonText);
+        
+        extractedGroups = parsed.map(g => ({
+            ...g,
+            players: (g.players || []).map(p => ({
+                ...p,
+                name: (p.name || '').toUpperCase(),
+                originalName: (p.name || '').toUpperCase()
+            }))
+        }));
+        renderGroups();
+    } catch (err) {
+        alert("OCR Error: " + err.message);
+    } finally {
+        ocrStatus.classList.add('hidden');
+        btnOcrScan.disabled = false;
+    }
+});
+
+        btnSaveGame.addEventListener('click', async () => {
+            const dateVal = inputGameDate.value;
+            if (!dateVal) return alert('Please pick a date');
+
+            calculateAllGroupsPoints();
+            const placements = [];
+            let totalCount = 0;
+            const activeNames = new Set();
+
+            for (const grp of extractedGroups) {
+                for (const p of grp.players) {
+                    const formattedName = (p.name.trim() || `PLAYER ${p.place}`).toUpperCase();
+                    if (activeNames.has(formattedName)) {
+                        return alert(`Duplicate player name found: "${formattedName}". Each player must have a unique name within the game.`);
+                    }
+                    activeNames.add(formattedName);
+                    totalCount++;
+                    
+                    placements.push({
+                        groupName: grp.groupName,
+                        place: p.place,
+                        name: formattedName,
+                        originalName: p.originalName || formattedName,
+                        setsWon: p.setsWon || 0,
+                        points: p.points,
+                        originalPoints: p.originalPoints !== undefined ? p.originalPoints : p.points,
+                        isRankEdited: !!p.isRankEdited,
+                        isNameEdited: !!p.isNameEdited,
+                        isPointsEdited: !!p.isPointsEdited
+                    });
+                }
+            }
+
+            const gameRecord = {
+                id: 'game_' + Date.now(),
+                date: dateVal,
+                photoUrl: currentImageDataUrl,
+                totalPlayers: totalCount,
+                groups: JSON.parse(JSON.stringify(extractedGroups)),
+                placements: placements
+            };
+
+            btnSaveGame.disabled = true;
+            btnSaveGame.textContent = "Uploading...";
+            await uploadGameToCloud(gameRecord, currentImageDataUrl);
+            btnSaveGame.disabled = false;
+            btnSaveGame.textContent = "Save to Central Storage";
+            modalUpload.classList.add('hidden');
+        });
+
+        function calculateAllGroupsPoints() {
+            let cumulativePlayerCount = 0;
+            const totalPlayersAcrossAll = extractedGroups.reduce((acc, g) => acc + g.players.length, 0);
+
+            extractedGroups.forEach((group, gIdx) => {
+                let pointsStart = gIdx === 0 ? totalPlayersAcrossAll : totalPlayersAcrossAll - cumulativePlayerCount;
+                
+                group.players.sort((a, b) => a.place !== b.place ? a.place - b.place : b.setsWon - a.setsWon);
+                
+                group.players.forEach((p, idx) => { 
+                    const calcPts = Math.max(1, pointsStart - idx);
+                    if (p.originalPoints === undefined) {
+                        p.originalPoints = calcPts;
+                    }
+                    if (!p.isPointsEdited) {
+                        p.points = calcPts;
+                    }
+                });
+
+                for (let i = 0; i < group.players.length - 1; i++) {
+                    const curr = group.players[i];
+                    const next = group.players[i + 1];
+                    if (curr.place === next.place && curr.setsWon === next.setsWon) {
+                        if (!next.isPointsEdited) {
+                            next.points = curr.points;
+                        }
+                    }
+                }
+
+                cumulativePlayerCount += group.players.length;
+            });
+        }
+
+        function renderGroups() {
+            calculateAllGroupsPoints();
+            groupsContainer.innerHTML = '';
+            
+            extractedGroups.forEach((group, gIdx) => {
+                const div = document.createElement('div');
+                div.className = 'bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2';
+                
+                const playersHtml = group.players.map((p, pIdx) => {
+                    const rankStyle = p.isRankEdited 
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400' 
+                        : 'bg-white text-slate-700 border-slate-300';
+
+                    const nameStyle = p.isNameEdited 
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400' 
+                        : 'bg-white text-slate-800 border-slate-300';
+                        
+                    const pointsStyle = p.isPointsEdited 
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400' 
+                        : 'bg-white text-emerald-600 border-slate-300';
+                    
+                    return `
+                        <div class="grid grid-cols-12 gap-2 text-xs items-center">
+                            <div class="col-span-2 flex items-center gap-0.5">
+                                <span class="font-bold text-slate-400">#</span>
+                                <input type="number" min="1" value="${p.place}" 
+                                    class="w-10 px-1 py-0.5 border rounded font-bold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${rankStyle}"
+                                    onchange="
+                                        extractedGroups[${gIdx}].players[${pIdx}].place = parseInt(this.value) || 1; 
+                                        extractedGroups[${gIdx}].players[${pIdx}].isRankEdited = true; 
+                                        renderGroups();
+                                    ">
+                            </div>
+                            
+                            <input type="text" value="${p.name.toUpperCase()}" 
+                                class="col-span-6 px-1.5 py-0.5 border rounded uppercase font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${nameStyle}" 
+                                onchange="
+                                    extractedGroups[${gIdx}].players[${pIdx}].name = this.value.toUpperCase(); 
+                                    extractedGroups[${gIdx}].players[${pIdx}].isNameEdited = true; 
+                                    this.className = 'col-span-6 px-1.5 py-0.5 border rounded uppercase font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors bg-yellow-200 text-yellow-900 border-yellow-400';
+                                ">
+                            
+                            <div class="col-span-4 flex items-center justify-end gap-1">
+                                <span class="font-bold text-slate-400">+</span>
+                                <input type="number" min="0" value="${p.points}" 
+                                    class="w-12 px-1 py-0.5 border rounded font-bold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${pointsStyle}"
+                                    onchange="
+                                        extractedGroups[${gIdx}].players[${pIdx}].points = parseInt(this.value) || 0; 
+                                        extractedGroups[${gIdx}].players[${pIdx}].isPointsEdited = true; 
+                                        this.className = 'w-12 px-1 py-0.5 border rounded font-bold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors bg-yellow-200 text-yellow-900 border-yellow-400';
+                                    ">
+                                <span class="font-bold text-slate-400">pts</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                div.innerHTML = `
+                    <div class="flex items-center justify-between border-b pb-2 mb-2">
+                        <span class="font-bold text-xs text-slate-700">${group.groupName}</span>
+                    </div>
+                    ${playersHtml}
+                `;
+                groupsContainer.appendChild(div);
+            });
+        }
+
+        function openPhotoModal(url) {
+            const modal = document.getElementById('modal-image-view');
+            const img = document.getElementById('modal-preview-img');
+            const link = document.getElementById('modal-preview-link');
+            img.src = url;
+            link.href = url;
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closePhotoModal() {
+            document.getElementById('modal-image-view').classList.add('hidden');
+        }
+
+        const leaderboardHead = document.getElementById('leaderboard-head');
+        const leaderboardBody = document.getElementById('leaderboard-body');
+
+        function updateGameFilterOptions() {
+            const currentSelected = selectGameFilter.value || 'all';
+            selectGameFilter.innerHTML = '<option value="all">All Games</option>';
+            gamesData.forEach((g, idx) => {
+                const opt = document.createElement('option');
+                opt.value = g.id;
+                opt.textContent = `Game ${idx + 1} (${g.date})`;
+                selectGameFilter.appendChild(opt);
+            });
+            if ([...selectGameFilter.options].some(o => o.value === currentSelected)) {
+                selectGameFilter.value = currentSelected;
+            } else {
+                selectGameFilter.value = 'all';
+            }
+        }
+
+        function renderAll() {
+            updateGameFilterOptions();
+            renderLeaderboard();
+            renderGamesList();
+        }
+
+        function renderLeaderboard() {
+            if (!gamesData || gamesData.length === 0) {
+                leaderboardHead.innerHTML = '';
+                leaderboardBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">No game statistics logged yet.</td></tr>`;
+                return;
+            }
+
+            const playerStatsMap = {};
+            gamesData.forEach(game => {
+                if (!game.placements) return;
+                
+                const gamePlayerPoints = {};
+                game.placements.forEach(p => {
+                    const upperName = (p.name || '').toUpperCase();
+                    if (!gamePlayerPoints[upperName]) {
+                        gamePlayerPoints[upperName] = { points: 0, setsWon: 0 };
+                    }
+                    gamePlayerPoints[upperName].points += p.points;
+                    gamePlayerPoints[upperName].setsWon += (p.setsWon || 0);
+                });
+
+                Object.entries(gamePlayerPoints).forEach(([upperName, stats]) => {
+                    if (!playerStatsMap[upperName]) {
+                        playerStatsMap[upperName] = { name: upperName, totalPoints: 0, totalSets: 0, gamesPlayed: 0, firstPlaces: 0, gameScores: {} };
+                    }
+                    playerStatsMap[upperName].totalPoints += stats.points;
+                    playerStatsMap[upperName].totalSets += stats.setsWon;
+                    playerStatsMap[upperName].gamesPlayed += 1;
+                    
+                    playerStatsMap[upperName].gameScores[game.id] = { points: stats.points };
+                });
+            });
+
+            const sorted = Object.values(playerStatsMap).sort((a, b) => b.totalPoints - a.totalPoints);
+
+            let headerHtml = `<tr><th class="py-3 px-3 text-center">Rank</th><th class="py-3 px-4">Player</th><th class="py-3 px-3 text-center bg-emerald-50/50">Total Pts</th><th class="py-3 px-3 text-center">Games</th>`;
+            gamesData.forEach((g, idx) => { headerHtml += `<th class="py-2 px-3 text-center">Game ${idx + 1}</th>`; });
+            headerHtml += `</tr>`;
+            leaderboardHead.innerHTML = headerHtml;
+
+            leaderboardBody.innerHTML = '';
+            sorted.forEach((player, idx) => {
+                let rowHtml = `<td class="py-3 px-3 text-center font-bold">#${idx + 1}</td>
+                    <td class="py-3 px-4 font-bold text-slate-800 uppercase">${player.name}</td>
+                    <td class="py-3 px-3 text-center font-black text-slate-900 bg-emerald-50/30">${player.totalPoints}</td>
+                    <td class="py-3 px-3 text-center">${player.gamesPlayed}</td>`;
+
+                gamesData.forEach((g) => {
+                    const scoreObj = player.gameScores[g.id];
+                    if (scoreObj !== undefined) {
+                        rowHtml += `<td class="py-2 px-3 text-center">
+                            <div class="inline-flex items-center justify-center px-2 py-1 rounded bg-slate-50 text-emerald-600 font-bold">
+                                +${scoreObj.points}
+                            </div>
+                        </td>`;
+                    } else {
+                        rowHtml += `<td class="py-2 px-3 text-center text-slate-300">-</td>`;
+                    }
+                });
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = rowHtml;
+                leaderboardBody.appendChild(tr);
+            });
+
+            lucide.createIcons();
+        }
+
+        function renderGamesList() {
+    if (!gamesData || gamesData.length === 0) {
+        gamesList.innerHTML = `<div class="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg"><i data-lucide="image" class="w-10 h-10 mx-auto text-slate-300 mb-2"></i><p>No uploaded games yet</p></div>`;
+        lucide.createIcons();
+        return;
+    }
+
+    const filterVal = selectGameFilter.value || 'all';
+    const filteredGames = filterVal === 'all' 
+        ? gamesData 
+        : gamesData.filter(g => g.id === filterVal);
+
+    if (filteredGames.length === 0) {
+        gamesList.innerHTML = `<div class="text-center py-8 text-slate-400 border border-slate-200 rounded-lg"><p>No games found for this selection.</p></div>`;
+        return;
+    }
+
+    gamesList.innerHTML = '';
+    [...filteredGames].reverse().forEach((game) => {
+        const gameIndex = gamesData.findIndex(g => g.id === game.id);
+        const gameNum = gameIndex >= 0 ? gameIndex + 1 : 1;
+        
+        const sortedPlacements = [...(game.placements || [])].sort((a, b) => b.points - a.points);
+        
+        let currentRank = 1;
+        const placementsWithDynamicRank = sortedPlacements.map((p, idx, arr) => {
+            if (idx > 0 && p.points < arr[idx - 1].points) {
+                currentRank = idx + 1;
+            }
+            return { ...p, dynamicRank: currentRank };
+        });
+
+        const deleteGameBtn = isEditMode ? `
+            <button onclick="confirmDeleteGame('${game.id}', ${gameNum})" title="Delete Game" class="text-slate-400 hover:text-red-600 p-1 rounded transition flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+        ` : '';
+
+        const div = document.createElement('div');
+        div.className = 'border border-slate-200 rounded-xl p-3 bg-white space-y-2';
+        
+        div.innerHTML = `
+            <div class="flex justify-between items-center text-xs border-b pb-1.5 mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-emerald-700">Game ${gameNum}</span>
+                    ${deleteGameBtn}
+                </div>
+                <span class="text-slate-400">${game.date}</span>
+            </div>
+            <div class="grid grid-cols-12 gap-3 items-start">
+                <div class="col-span-4 relative group cursor-pointer" onclick="openPhotoModal('${game.photoUrl}')" title="Click to view full image">
+                    <img src="${game.photoUrl}" alt="Scorecard photo" class="w-full h-24 object-cover rounded-lg border border-slate-200 group-hover:opacity-90 transition">
+                    <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center text-white text-[11px] font-semibold gap-1">
+                        <i data-lucide="zoom-in" class="w-4 h-4"></i> View
+                    </div>
+                </div>
+                <div class="col-span-8 text-xs space-y-1.5">
+                    ${placementsWithDynamicRank.map(p => {
+                        const upperName = (p.name || '').toUpperCase();
+                        const originalExtractedName = (p.originalName || p.name || '').toUpperCase();
+                        const originalPointsVal = p.originalPoints !== undefined ? p.originalPoints : p.points;
+                        const safeName = upperName.replace(/'/g, "\\'");
+                        const safeOriginalName = originalExtractedName.replace(/'/g, "\\'");
+                        
+                        const isRankEdited = !!p.isRankEdited || p.dynamicRank !== p.place;
+                        const isNameEdited = !!p.isNameEdited;
+                        const isPointsEdited = !!p.isPointsEdited || !!p.isEdited;
+
+                        const rankStyle = isRankEdited 
+                            ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1 rounded font-bold' 
+                            : 'font-bold text-slate-400';
+
+                        const nameStyle = isNameEdited 
+                            ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1 rounded font-bold' 
+                            : 'font-bold text-slate-700';
+
+                        const pointsStyle = isPointsEdited 
+                            ? 'bg-yellow-200 text-yellow-900 border border-yellow-300 px-1.5 py-0.5 rounded font-bold' 
+                            : 'text-emerald-600 font-bold';
+
+                        const editPlayerBtn = isEditMode ? `
+                            <button onclick="openEditPlayerModal('${game.id}', '${safeName}', '${safeOriginalName}')" title="Edit player name in this game only" class="text-slate-400 hover:text-indigo-600 p-0.5 rounded">
+                                <i data-lucide="edit-2" class="w-3 h-3"></i>
+                            </button>
+                        ` : '';
+
+                        const editScoreBtn = isEditMode ? `
+                            <button onclick="openEditScoreModal('${game.id}', '${safeName}', 'Game ${gameNum}', ${p.points}, ${originalPointsVal})" title="Edit score" class="text-slate-400 hover:text-amber-600 p-0.5 rounded">
+                                <i data-lucide="edit-3" class="w-3 h-3"></i>
+                            </button>
+                        ` : '';
+
+                        return `
+                            <div class="flex items-center justify-between bg-slate-50 p-1.5 rounded-md border border-slate-100 gap-1">
+                                <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                    <span class="text-[11px] ${rankStyle}">#${p.dynamicRank}</span>
+                                    <span class="uppercase truncate ${nameStyle}">${upperName}</span>
+                                    ${editPlayerBtn}
+                                </div>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <span class="${pointsStyle}">+${p.points} pts</span>
+                                    ${editScoreBtn}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+        gamesList.appendChild(div);
+    });
+    lucide.createIcons();
+}
+
+        const modalEditPlayer = document.getElementById('modal-edit-player');
+        const modalEditScore = document.getElementById('modal-edit-score');
+        const modalConfirmPopup = document.getElementById('modal-confirm-popup');
+        const confirmPopupText = document.getElementById('confirm-popup-text');
+        const containerEditPlayerPassword = document.getElementById('container-edit-player-password');
+        const containerEditScorePassword = document.getElementById('container-edit-score-password');
+
+        function openEditPlayerModal(gameId, currentName, originalName) {
+            const upperCurrent = currentName.toUpperCase();
+            const upperOriginal = (originalName || currentName).toUpperCase();
+            editingPlayerTargetGameId = gameId;
+            editingPlayerOldName = upperCurrent;
+            document.getElementById('edit-original-name').value = upperOriginal;
+            document.getElementById('edit-old-name').value = upperCurrent;
+            document.getElementById('edit-new-name').value = upperCurrent;
+            document.getElementById('edit-password').value = '';
+
+            if (isEditMode) {
+                containerEditPlayerPassword.classList.add('hidden');
+            } else {
+                containerEditPlayerPassword.classList.remove('hidden');
+            }
+
+            modalEditPlayer.classList.remove('hidden');
+        }
+
+        document.getElementById('btn-confirm-edit').addEventListener('click', async () => {
+            if (!isEditMode) {
+                const pwd = document.getElementById('edit-password').value;
+                const check = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "verifyEditPassword", password: pwd })
+                }).then(r => r.json()).catch(() => ({}));
+                if (!check || !check.success) return alert('Incorrect password');
+            }
+            const newName = document.getElementById('edit-new-name').value.trim().toUpperCase();
+            if (!newName) return alert('Name cannot be empty');
+
+            const targetGame = gamesData.find(g => g.id === editingPlayerTargetGameId);
+            if (targetGame && targetGame.placements) {
+                const nameExists = targetGame.placements.some(p => (p.name || '').toUpperCase() === newName && (p.name || '').toUpperCase() !== editingPlayerOldName);
+                if (nameExists) {
+                    return alert(`Player name "${newName}" already exists in this game! Please use a unique name.`);
+                }
+            }
+            
+            confirmPopupText.innerHTML = `Rename <strong>"${editingPlayerOldName}"</strong> to <strong>"${newName}"</strong> in this specific game only?`;
+            pendingAction = () => {
+                if (targetGame) {
+                    if (targetGame.placements) {
+                        targetGame.placements.forEach(p => { 
+                            if ((p.name || '').toUpperCase() === editingPlayerOldName) {
+                                p.name = newName;
+                                p.isNameEdited = true;
+                            } 
+                        });
+                    }
+                    if (targetGame.groups) {
+                        targetGame.groups.forEach(grp => {
+                            (grp.players || []).forEach(p => {
+                                if ((p.name || '').toUpperCase() === editingPlayerOldName) {
+                                    p.name = newName;
+                                }
+                            });
+                        });
+                    }
+                }
+                syncCloudData();
+                renderAll();
+            };
+            modalEditPlayer.classList.add('hidden');
+            modalConfirmPopup.classList.remove('hidden');
+        });
+
+        function openEditScoreModal(gameId, playerName, gameLabel, currentPoints, originalPoints) {
+            editingScoreTarget = { gameId, playerName: playerName.toUpperCase() };
+            document.getElementById('score-player-name').value = playerName.toUpperCase();
+            document.getElementById('score-game-label').value = gameLabel;
+            document.getElementById('score-original-points').value = (originalPoints !== undefined ? originalPoints : currentPoints) + " pts";
+            document.getElementById('score-new-points').value = currentPoints;
+            document.getElementById('score-password').value = '';
+
+            if (isEditMode) {
+                containerEditScorePassword.classList.add('hidden');
+            } else {
+                containerEditScorePassword.classList.remove('hidden');
+            }
+
+            modalEditScore.classList.remove('hidden');
+        }
+
+        document.getElementById('btn-confirm-score').addEventListener('click', async () => {
+            if (!isEditMode) {
+                const pwd = document.getElementById('score-password').value;
+                const check = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "verifyEditPassword", password: pwd })
+                }).then(r => r.json()).catch(() => ({}));
+                if (!check || !check.success) return alert('Incorrect password');
+            }
+            const newPts = parseInt(document.getElementById('score-new-points').value);
+            if (isNaN(newPts) || newPts < 0) return alert('Please enter a valid points number');
+
+            confirmPopupText.innerHTML = `Set score for <strong>"${editingScoreTarget.playerName}"</strong> to <strong>${newPts} pts</strong>?`;
+            pendingAction = () => {
+                const g = gamesData.find(x => x.id === editingScoreTarget.gameId);
+                if (g && g.placements) {
+                    const p = g.placements.find(x => (x.name || '').toUpperCase() === editingScoreTarget.playerName);
+                    if (p) { 
+                        p.points = newPts; 
+                        p.isPointsEdited = true;
+                        p.isEdited = true; 
+                    }
+                }
+                syncCloudData();
+                renderAll();
+            };
+            modalEditScore.classList.add('hidden');
+            modalConfirmPopup.classList.remove('hidden');
+        });
+
+        document.getElementById('btn-popup-yes').addEventListener('click', () => {
+            if (pendingAction) pendingAction();
+            modalConfirmPopup.classList.add('hidden');
+        });
+        document.getElementById('btn-popup-no').addEventListener('click', () => modalConfirmPopup.classList.add('hidden'));
+
+        document.getElementById('btn-close-edit-modal').addEventListener('click', () => modalEditPlayer.classList.add('hidden'));
+        document.getElementById('btn-cancel-edit').addEventListener('click', () => modalEditPlayer.classList.add('hidden'));
+        document.getElementById('btn-close-score-modal').addEventListener('click', () => modalEditScore.classList.add('hidden'));
+        document.getElementById('btn-cancel-score').addEventListener('click', () => modalEditScore.classList.add('hidden'));
+
+function confirmDeleteGame(gameId, gameNum) {
+    confirmPopupText.innerHTML = `Are you sure you want to permanently delete <strong>Game ${gameNum}</strong>? This will recalculate the entire leaderboard.`;
+    pendingAction = () => {
+        gamesData = gamesData.filter(g => g.id !== gameId);
+        syncCloudData();
+        renderAll();
+    };
+    modalConfirmPopup.classList.remove('hidden');
+}
+
+    </script>
+</body>
+</html>
