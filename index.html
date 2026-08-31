@@ -105,16 +105,14 @@
                     <p class="font-semibold text-slate-800">1. Site Access & Edit Mode:</p>
                     <p class="text-[11px] text-slate-600">Site access is password protected upon opening. Turn on 'Edit Mode' using password authorization to show edit controls and modify game entries seamlessly.</p>
                     
-                    <p class="font-semibold text-slate-800 pt-1 border-t border-slate-200">2. Points Assignment Rules:</p>
-                    <p class="text-[11px] text-slate-600">Points are automatically assigned to players based on their placement in extracted scorecard data:</p>
+                    <p class="font-semibold text-slate-800 pt-1 border-t border-slate-200">2. Frontend Points & Tie-Breaker Rules:</p>
+                    <p class="text-[11px] text-slate-600">Ranks and points are assigned automatically by the frontend engine from scorecard statistics:</p>
                     <ul class="list-disc list-inside text-[11px] text-slate-600 space-y-0.5 pl-1">
-                        <li><strong>1st Place:</strong> Earns maximum points equal to total group/session players.</li>
-                        <li><strong>Descending Scale:</strong> Each subsequent placement earns 1 point less down to a minimum of 1 point.</li>
-                        <li><strong>Tie-Breaker:</strong> Ties in ranking are resolved by total sets won.</li>
+                        <li><strong>1st Criterion:</strong> Total Sets Won (descending).</li>
+                        <li><strong>2nd Criterion (Tie-Breaker):</strong> Total Score Points Won (descending).</li>
+                        <li><strong>Exact Ties:</strong> Players with identical sets and points receive the same highest place and identical points.</li>
+                        <li><strong>Manual Edits:</strong> Manually changing place or points dynamically updates the corresponding value and highlights in yellow.</li>
                     </ul>
-
-                    <p class="font-semibold text-slate-800 pt-1 border-t border-slate-200">3. Isolated Game Editing:</p>
-                    <p class="text-[11px] text-slate-600">Player names are restricted per game session. Editing a name in Game 1 will only affect Game 1 and will not overwrite the same player in other games.</p>
                 </div>
             </div>
         </section>
@@ -171,7 +169,6 @@
 
             <div id="modal-scroll-body" class="p-3 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
                 <div id="step-1-upload" class="space-y-4">
-                    <!-- Dual Inputs for File Upload & Direct Camera Capture -->
                     <input type="file" id="input-photo" accept="image/*" class="hidden">
                     <input type="file" id="input-camera" accept="image/*" capture="environment" class="hidden">
                     
@@ -230,7 +227,6 @@
                         <div class="flex items-center justify-between mb-2">
                             <h4 class="font-bold text-xs sm:text-sm text-slate-800">Extracted Standings</h4>
                         </div>
-                        <!-- Removed max-h-60 and inner overflow scroll so standings strictly follow main modal view -->
                         <div id="groups-container" class="space-y-4"></div>
                     </div>
                 </div>
@@ -366,8 +362,8 @@
             {
                 groupName: "Group 1",
                 players: [
-                    { place: 1, name: "PLAYER 1", setsWon: 2, points: 2, originalPoints: 2 },
-                    { place: 2, name: "PLAYER 2", setsWon: 1, points: 1, originalPoints: 1 }
+                    { place: 1, name: "PLAYER 1", setsWon: 2, pointsWon: 42, points: 2, originalPoints: 2 },
+                    { place: 2, name: "PLAYER 2", setsWon: 1, pointsWon: 35, points: 1, originalPoints: 1 }
                 ]
             }
         ];
@@ -619,14 +615,13 @@
             extractedGroups = [{
                 groupName: "Group 1",
                 players: [
-                    { place: 1, name: "PLAYER 1", setsWon: 2, points: 2, originalPoints: 2 },
-                    { place: 2, name: "PLAYER 2", setsWon: 1, points: 1, originalPoints: 1 }
+                    { place: 1, name: "PLAYER 1", setsWon: 2, pointsWon: 42, points: 2, originalPoints: 2 },
+                    { place: 2, name: "PLAYER 2", setsWon: 1, pointsWon: 35, points: 1, originalPoints: 1 }
                 ]
             }];
             renderGroups();
         }
 
-        // Feature 1: Explicit trigger support for file upload & direct camera photo capture
         btnTriggerUpload.addEventListener('click', () => inputPhoto.click());
         btnTriggerCamera.addEventListener('click', () => inputCamera.click());
 
@@ -716,7 +711,6 @@
                 if (w > 15 && h > 15) {
                     tableRegion = { x: Math.min(startX, c.x), y: Math.min(startY, c.y), w, h };
                     
-                    // Feature 2: Scroll window automatically to 'Extract Names & Scores' button when crop is completed
                     setTimeout(() => {
                         btnOcrScan.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }, 50);
@@ -796,12 +790,19 @@
                 const jsonText = candidates[0].content.parts[0].text;
                 const parsed = JSON.parse(jsonText);
                 
+                // Issue 1 Fix: Pure OCR transcription without Gemini rank placement
                 extractedGroups = parsed.map(g => ({
                     ...g,
                     players: (g.players || []).map(p => ({
-                        ...p,
                         name: (p.name || '').toUpperCase(),
-                        originalName: (p.name || '').toUpperCase()
+                        originalName: (p.name || '').toUpperCase(),
+                        setsWon: p.setsWon || 0,
+                        pointsWon: p.pointsWon || 0,
+                        place: 1, // Place calculated strictly by frontend engine
+                        points: 0,
+                        isRankEdited: false,
+                        isNameEdited: false,
+                        isPointsEdited: false
                     }))
                 }));
                 renderGroups();
@@ -837,6 +838,7 @@
                         name: formattedName,
                         originalName: p.originalName || formattedName,
                         setsWon: p.setsWon || 0,
+                        pointsWon: p.pointsWon || 0,
                         points: p.points,
                         originalPoints: p.originalPoints !== undefined ? p.originalPoints : p.points,
                         isRankEdited: !!p.isRankEdited,
@@ -863,6 +865,7 @@
             modalUpload.classList.add('hidden');
         });
 
+        // FRONTEND CALCULATION ENGINE WITH DYNAMIC MANUAL EDIT CROSS-UPDATING
         function calculateAllGroupsPoints() {
             let cumulativePlayerCount = 0;
             const totalPlayersAcrossAll = extractedGroups.reduce((acc, g) => acc + g.players.length, 0);
@@ -870,30 +873,74 @@
             extractedGroups.forEach((group, gIdx) => {
                 let pointsStart = gIdx === 0 ? totalPlayersAcrossAll : totalPlayersAcrossAll - cumulativePlayerCount;
                 
-                group.players.sort((a, b) => a.place !== b.place ? a.place - b.place : b.setsWon - a.setsWon);
-                
-                group.players.forEach((p, idx) => { 
-                    const calcPts = Math.max(1, pointsStart - idx);
-                    if (p.originalPoints === undefined) {
-                        p.originalPoints = calcPts;
+                // Sort players: Default by Sets Won (desc), then Points Won (desc) unless manually overridden
+                group.players.sort((a, b) => {
+                    if (a.isRankEdited || b.isRankEdited || a.isPointsEdited || b.isPointsEdited) {
+                        return (a.place || 1) - (b.place || 1);
                     }
-                    if (!p.isPointsEdited) {
-                        p.points = calcPts;
+                    if ((b.setsWon || 0) !== (a.setsWon || 0)) {
+                        return (b.setsWon || 0) - (a.setsWon || 0);
+                    }
+                    return (b.pointsWon || 0) - (a.pointsWon || 0);
+                });
+
+                // Assign places and points with exact tie handling & dynamic update propagation
+                group.players.forEach((p, idx) => { 
+                    if (!p.isRankEdited && !p.isPointsEdited) {
+                        if (idx === 0) {
+                            p.place = 1;
+                            p.points = pointsStart;
+                        } else {
+                            const prev = group.players[idx - 1];
+                            const isTied = !prev.isRankEdited && !prev.isPointsEdited &&
+                                           (p.setsWon || 0) === (prev.setsWon || 0) && 
+                                           (p.pointsWon || 0) === (prev.pointsWon || 0);
+
+                            if (isTied) {
+                                p.place = prev.place;
+                                p.points = prev.points;
+                            } else {
+                                p.place = idx + 1;
+                                p.points = Math.max(1, pointsStart - idx);
+                            }
+                        }
+                    } else if (p.isRankEdited && !p.isPointsEdited) {
+                        // Place was modified manually -> dynamically update placement points
+                        p.points = Math.max(1, pointsStart - ((p.place || 1) - 1));
+                    } else if (p.isPointsEdited && !p.isRankEdited) {
+                        // Points was modified manually -> dynamically update rank place
+                        p.place = Math.max(1, pointsStart - (p.points || 0) + 1);
+                    }
+
+                    if (p.originalPoints === undefined) {
+                        p.originalPoints = p.points;
                     }
                 });
 
-                for (let i = 0; i < group.players.length - 1; i++) {
-                    const curr = group.players[i];
-                    const next = group.players[i + 1];
-                    if (curr.place === next.place && curr.setsWon === next.setsWon) {
-                        if (!next.isPointsEdited) {
-                            next.points = curr.points;
-                        }
-                    }
-                }
-
                 cumulativePlayerCount += group.players.length;
             });
+        }
+
+        // Helper functions triggered by manual input in Upload Modal
+        function updatePlayerPlace(gIdx, pIdx, newPlace) {
+            const p = extractedGroups[gIdx].players[pIdx];
+            p.place = parseInt(newPlace) || 1;
+            p.isRankEdited = true;
+            renderGroups();
+        }
+
+        function updatePlayerPoints(gIdx, pIdx, newPoints) {
+            const p = extractedGroups[gIdx].players[pIdx];
+            p.points = parseInt(newPoints) || 0;
+            p.isPointsEdited = true;
+            renderGroups();
+        }
+
+        function updatePlayerName(gIdx, pIdx, newName) {
+            const p = extractedGroups[gIdx].players[pIdx];
+            p.name = newName.toUpperCase();
+            p.isNameEdited = true;
+            renderGroups();
         }
 
         function renderGroups() {
@@ -905,49 +952,46 @@
                 div.className = 'bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2';
                 
                 const playersHtml = group.players.map((p, pIdx) => {
+                    // Issue 2 Fix: Yellow styling for manually edited values
                     const rankStyle = p.isRankEdited 
-                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400' 
-                        : 'bg-white text-slate-700 border-slate-300';
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400 font-bold' 
+                        : 'bg-white text-slate-700 border-slate-300 font-bold';
 
                     const nameStyle = p.isNameEdited 
-                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400' 
-                        : 'bg-white text-slate-800 border-slate-300';
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400 font-semibold' 
+                        : 'bg-white text-slate-800 border-slate-300 font-semibold';
                         
                     const pointsStyle = p.isPointsEdited 
-                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400' 
-                        : 'bg-white text-emerald-600 border-slate-300';
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400 font-bold' 
+                        : 'bg-white text-emerald-600 border-slate-300 font-bold';
                     
                     return `
-                        <div class="grid grid-cols-12 gap-2 text-xs items-center">
+                        <div class="grid grid-cols-12 gap-1.5 text-xs items-center">
+                            <!-- Rank Place Input (Manual edit highlights yellow & dynamically updates points) -->
                             <div class="col-span-2 flex items-center gap-0.5">
                                 <span class="font-bold text-slate-400">#</span>
                                 <input type="number" min="1" value="${p.place}" 
-                                    class="w-10 px-1 py-0.5 border rounded font-bold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${rankStyle}"
-                                    onchange="
-                                        extractedGroups[${gIdx}].players[${pIdx}].place = parseInt(this.value) || 1; 
-                                        extractedGroups[${gIdx}].players[${pIdx}].isRankEdited = true; 
-                                        renderGroups();
-                                    ">
+                                    class="w-10 px-1 py-0.5 border rounded text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${rankStyle}"
+                                    onchange="updatePlayerPlace(${gIdx}, ${pIdx}, this.value)">
                             </div>
                             
-                            <input type="text" value="${p.name.toUpperCase()}" 
-                                class="col-span-6 px-1.5 py-0.5 border rounded uppercase font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${nameStyle}" 
-                                onchange="
-                                    extractedGroups[${gIdx}].players[${pIdx}].name = this.value.toUpperCase(); 
-                                    extractedGroups[${gIdx}].players[${pIdx}].isNameEdited = true; 
-                                    this.className = 'col-span-6 px-1.5 py-0.5 border rounded uppercase font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors bg-yellow-200 text-yellow-900 border-yellow-400';
-                                ">
+                            <!-- Player Name Input (Manual edit highlights yellow) -->
+                            <input type="text" value="${(p.name || '').toUpperCase()}" 
+                                class="col-span-4 px-1.5 py-0.5 border rounded uppercase focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${nameStyle}" 
+                                onchange="updatePlayerName(${gIdx}, ${pIdx}, this.value)">
+
+                            <!-- Read-Only Extracted Stats -->
+                            <div class="col-span-3 text-[10px] font-bold text-slate-600 bg-slate-200/80 border border-slate-300 px-1.5 py-1 rounded text-center truncate select-none" title="Extracted Read-Only: ${p.setsWon || 0} Sets Won / ${p.pointsWon || 0} Score Points Won">
+                                ${p.setsWon || 0}S / ${p.pointsWon || 0}P
+                            </div>
                             
-                            <div class="col-span-4 flex items-center justify-end gap-1">
+                            <!-- Placement Points Input (Manual edit highlights yellow & dynamically updates place) -->
+                            <div class="col-span-3 flex items-center justify-end gap-0.5">
                                 <span class="font-bold text-slate-400">+</span>
                                 <input type="number" min="0" value="${p.points}" 
-                                    class="w-12 px-1 py-0.5 border rounded font-bold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${pointsStyle}"
-                                    onchange="
-                                        extractedGroups[${gIdx}].players[${pIdx}].points = parseInt(this.value) || 0; 
-                                        extractedGroups[${gIdx}].players[${pIdx}].isPointsEdited = true; 
-                                        this.className = 'w-12 px-1 py-0.5 border rounded font-bold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors bg-yellow-200 text-yellow-900 border-yellow-400';
-                                    ">
-                                <span class="font-bold text-slate-400">pts</span>
+                                    class="w-10 px-1 py-0.5 border rounded text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors ${pointsStyle}"
+                                    onchange="updatePlayerPoints(${gIdx}, ${pIdx}, this.value)">
+                                <span class="font-bold text-slate-400 text-[10px]">pts</span>
                             </div>
                         </div>
                     `;
