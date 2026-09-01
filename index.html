@@ -36,12 +36,12 @@
             <div class="flex items-center gap-2">
                 <button id="btn-toggle-edit" class="bg-emerald-700/80 hover:bg-emerald-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition">
                     <i id="icon-edit-mode" data-lucide="lock" class="w-4 h-4"></i>
-                    <span id="text-edit-mode">Edit Mode</span>
+                    <span id="text-edit-mode">Edit</span>
                 </button>
 
                 <button id="btn-new-game" class="bg-white text-emerald-700 hover:bg-emerald-50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                    <span>Upload Scorecard</span>
+                    <span>Upload</span>
                 </button>
             </div>
         </div>
@@ -118,6 +118,11 @@
                     <div class="pt-2 border-t border-slate-200">
                         <p class="font-semibold text-slate-800">3. Full Game Editing:</p>
                         <p class="text-[11px] text-slate-600 mt-0.5">Click the edit icon next to any Game title in Consolidated Games to reopen the Scorecard Editor and modify date, group ranks, or player names.</p>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200">
+                        <p class="font-semibold text-slate-800">4. Yellow Highlighted Items:</p>
+                        <p class="text-[11px] text-slate-600 mt-0.5">Items highlighted in yellow indicate data (such as player names or ranks) that have been manually modified.</p>
                     </div>
                 </div>
             </div>
@@ -332,6 +337,18 @@
         const btnSubmitEditMode = document.getElementById('btn-submit-edit-mode');
         const btnCancelEditMode = document.getElementById('btn-cancel-edit-mode');
 
+        // Helper function to keep games strictly ordered by photo date (earliest date = Game 1)
+        function sortGamesByDate() {
+            if (!Array.isArray(gamesData)) return;
+            gamesData.sort((a, b) => {
+                const dateA = a.date || '';
+                const dateB = b.date || '';
+                if (dateA < dateB) return -1;
+                if (dateA > dateB) return 1;
+                return (a.id || '').localeCompare(b.id || '');
+            });
+        }
+
         // Scroll locking helpers to prevent background page scroll on mobile
         function updateScrollLock() {
             const openModals = [
@@ -429,7 +446,7 @@
         }
 
         function updateEditModeUI() {
-            textEditMode.textContent = 'Edit Mode';
+            textEditMode.textContent = 'Edit';
             if (isEditMode) {
                 btnToggleEdit.className = 'bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition ring-2 ring-amber-300';
                 iconEditMode.setAttribute('data-lucide', 'unlock');
@@ -482,6 +499,7 @@
         }
 
         async function syncCloudData() {
+            sortGamesByDate();
             saveToLocalStorage();
             if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("PASTE_YOUR")) return;
 
@@ -499,6 +517,7 @@
 
         async function uploadGameToCloud(gameRecord, base64Img) {
             gamesData.push(gameRecord);
+            sortGamesByDate();
             saveToLocalStorage();
             renderAll();
 
@@ -527,6 +546,7 @@
         }
 
         function saveToLocalStorage() {
+            sortGamesByDate();
             localStorage.setItem('shuttle_stat_games_v3', JSON.stringify(gamesData));
         }
 
@@ -535,6 +555,7 @@
             if (stored) {
                 try {
                     gamesData = JSON.parse(stored);
+                    sortGamesByDate();
                 } catch (e) {
                     gamesData = [];
                 }
@@ -615,6 +636,7 @@
 
         // Open scorecard editor to edit an existing game
         function openEditGameModal(gameId) {
+            sortGamesByDate();
             const gameIndex = gamesData.findIndex(g => g.id === gameId);
             const game = gamesData[gameIndex];
             if (!game) return;
@@ -1137,6 +1159,7 @@
         }
 
         function renderAll() {
+            sortGamesByDate();
             updateGameFilterOptions();
             renderLeaderboard();
             renderGamesList();
@@ -1230,7 +1253,7 @@
                 } else {
                     leaderboardRenameBanner.innerHTML = `
                         <span class="text-xs bg-amber-100 text-amber-800 font-medium px-2.5 py-1 rounded-md border border-amber-200 flex items-center gap-1">
-                            <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i> Edit Mode: Click a player name (1st click) to change, then click target name (2nd click).
+                            <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i> Click a player name and then target name.
                         </span>
                     `;
                 }
