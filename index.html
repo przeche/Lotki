@@ -11,6 +11,7 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .touch-none { touch-action: none; }
+        .touch-auto { touch-action: auto; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
@@ -161,18 +162,24 @@
 
     <!-- Upload / Edit Scorecard Modal -->
     <div id="modal-upload" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-2 sm:p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden">
-            <div class="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
                 <div class="flex items-center space-x-2">
                     <i data-lucide="camera" class="w-5 h-5 text-emerald-600"></i>
                     <h3 id="modal-scorecard-title" class="font-bold text-slate-800 text-base sm:text-lg">Scorecard Editor</h3>
                 </div>
-                <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="btn-toggle-crop" type="button" class="hidden sm:hidden px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center gap-1 shadow-sm">
+                        <i data-lucide="crop" class="w-3.5 h-3.5"></i>
+                        <span id="text-toggle-crop">Crop Mode</span>
+                    </button>
+                    <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
             </div>
 
-            <div id="modal-scroll-body" class="p-3 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+            <div id="modal-scroll-body" class="p-3 sm:p-6 overflow-y-auto overscroll-contain custom-scrollbar flex-1 space-y-4">
                 <div id="step-1-upload" class="space-y-4">
                     <input type="file" id="input-photo" accept="image/*" class="hidden">
                     <input type="file" id="input-camera" accept="image/*" capture="environment" class="hidden">
@@ -196,17 +203,17 @@
                 </div>
 
                 <div id="step-2-annotate" class="hidden space-y-4">
-                    <div class="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-3 rounded-xl text-xs text-indigo-800">
+                    <div class="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-3 rounded-xl text-xs text-indigo-800 flex-wrap gap-2">
                         <div class="flex items-center gap-2">
                             <i data-lucide="bounding-box" class="w-4 h-4 text-indigo-600 shrink-0"></i>
-                            <span>Drag across image to select/crop table area.</span>
+                            <span id="crop-status-text">Scroll freely, or tap Crop Mode in top right corner to select table region.</span>
                         </div>
-                        <button id="btn-reset-box" class="text-[11px] font-semibold text-indigo-600 hover:underline">Reset</button>
+                        <button id="btn-reset-box" type="button" class="text-[11px] font-semibold text-indigo-600 hover:underline">Reset Box</button>
                     </div>
 
                     <div class="relative w-full overflow-hidden border border-slate-200 rounded-xl bg-slate-900 flex justify-center items-center min-h-[220px]">
-                        <div id="canvas-container" class="relative inline-block select-none touch-none">
-                            <canvas id="annotation-canvas" class="max-w-full h-auto block cursor-crosshair touch-none"></canvas>
+                        <div id="canvas-container" class="relative inline-block select-none">
+                            <canvas id="annotation-canvas" class="max-w-full h-auto block cursor-crosshair touch-auto"></canvas>
                         </div>
                     </div>
 
@@ -214,7 +221,7 @@
                         <div class="flex items-center justify-center">
                             <button id="btn-ocr-scan" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2">
                                 <i data-lucide="sparkles" class="w-4 h-4 text-yellow-300"></i>
-                                <span>Re-extract Names & Scores via AI</span>
+                                <span>Extract Names & Scores</span>
                             </button>
                         </div>
                         <div id="ocr-status" class="text-center text-xs text-indigo-600 font-semibold hidden flex items-center justify-center gap-2">
@@ -237,7 +244,7 @@
                 </div>
             </div>
 
-            <div class="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div class="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
                 <button id="btn-modal-cancel" class="px-3 py-1.5 text-xs text-slate-600 font-semibold">Cancel</button>
                 <button id="btn-save-game" class="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-sm transition hidden">
                     Save to Central Storage
@@ -290,6 +297,7 @@
         let currentImageDataUrl = '';
         let tableRegion = null;
         let isDrawing = false;
+        let isCropMode = false;
         let startX = 0, startY = 0;
         
         let pendingAction = null;
@@ -323,6 +331,23 @@
         const btnSubmitEditMode = document.getElementById('btn-submit-edit-mode');
         const btnCancelEditMode = document.getElementById('btn-cancel-edit-mode');
 
+        // Scroll locking helpers to prevent background page scroll on mobile
+        function updateScrollLock() {
+            const openModals = [
+                modalSitePassword,
+                modalEditModePassword,
+                document.getElementById('modal-upload'),
+                document.getElementById('modal-image-view'),
+                document.getElementById('modal-confirm-popup')
+            ];
+            const hasOpen = openModals.some(m => m && !m.classList.contains('hidden'));
+            if (hasOpen) {
+                document.body.classList.add('overflow-hidden');
+            } else {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
         btnSiteLogin.addEventListener('click', checkSiteAccess);
         sitePasswordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') checkSiteAccess(); });
 
@@ -340,6 +365,7 @@
                     currentAccessPassword = pwd;
                     modalSitePassword.classList.add('hidden');
                     sitePasswordError.classList.add('hidden');
+                    updateScrollLock();
                     fetchCloudData();
                 } else {
                     sitePasswordError.classList.remove('hidden');
@@ -361,11 +387,16 @@
                 editModePasswordInput.value = '';
                 editModePasswordError.classList.add('hidden');
                 modalEditModePassword.classList.remove('hidden');
+                updateScrollLock();
                 editModePasswordInput.focus();
             }
         });
 
-        btnCancelEditMode.addEventListener('click', () => modalEditModePassword.classList.add('hidden'));
+        btnCancelEditMode.addEventListener('click', () => {
+            modalEditModePassword.classList.add('hidden');
+            updateScrollLock();
+        });
+        
         btnSubmitEditMode.addEventListener('click', submitEditModePassword);
         editModePasswordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') submitEditModePassword(); });
 
@@ -383,6 +414,7 @@
                     isEditMode = true;
                     renameSourcePlayer = null;
                     modalEditModePassword.classList.add('hidden');
+                    updateScrollLock();
                     updateEditModeUI();
                     renderAll();
                 } else {
@@ -410,6 +442,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             modalSitePassword.classList.remove('hidden');
+            updateScrollLock();
             attachCanvasPointerEvents();
             setDefaultDate();
             
@@ -526,6 +559,10 @@
         const canvas = document.getElementById('annotation-canvas');
         const ctx = canvas.getContext('2d');
         const btnResetBox = document.getElementById('btn-reset-box');
+        const btnToggleCrop = document.getElementById('btn-toggle-crop');
+        const textToggleCrop = document.getElementById('text-toggle-crop');
+        const cropStatusText = document.getElementById('crop-status-text');
+
         const btnOcrScan = document.getElementById('btn-ocr-scan');
         const ocrStatus = document.getElementById('ocr-status');
 
@@ -538,10 +575,17 @@
             modalScorecardTitle.textContent = "Upload New Scorecard";
             btnSaveGame.textContent = "Save to Central Storage";
             modalUpload.classList.remove('hidden');
+            updateScrollLock();
         });
 
-        btnCloseModal.addEventListener('click', () => modalUpload.classList.add('hidden'));
-        btnModalCancel.addEventListener('click', () => modalUpload.classList.add('hidden'));
+        btnCloseModal.addEventListener('click', () => {
+            modalUpload.classList.add('hidden');
+            updateScrollLock();
+        });
+        btnModalCancel.addEventListener('click', () => {
+            modalUpload.classList.add('hidden');
+            updateScrollLock();
+        });
 
         function setDefaultDate() { inputGameDate.value = new Date().toISOString().split('T')[0]; }
 
@@ -549,9 +593,12 @@
             step1.classList.remove('hidden');
             step2.classList.add('hidden');
             btnSaveGame.classList.add('hidden');
+            btnToggleCrop.classList.add('hidden');
             currentImageObj = null;
             currentImageDataUrl = '';
             tableRegion = null;
+            isCropMode = false;
+            updateCropModeUI();
             inputPhoto.value = '';
             inputCamera.value = '';
             setDefaultDate();
@@ -615,10 +662,12 @@
             step1.classList.add('hidden');
             step2.classList.remove('hidden');
             btnSaveGame.classList.remove('hidden');
+            btnToggleCrop.classList.remove('hidden');
             btnSaveGame.textContent = "Update Game Record";
 
             renderGroups();
             modalUpload.classList.remove('hidden');
+            updateScrollLock();
         }
 
         btnTriggerUpload.addEventListener('click', () => inputPhoto.click());
@@ -642,6 +691,7 @@
                     step1.classList.add('hidden');
                     step2.classList.remove('hidden');
                     btnSaveGame.classList.remove('hidden');
+                    btnToggleCrop.classList.remove('hidden');
                 };
                 img.src = currentImageDataUrl;
             };
@@ -675,6 +725,28 @@
             }
         }
 
+        btnToggleCrop.addEventListener('click', () => {
+            isCropMode = !isCropMode;
+            updateCropModeUI();
+        });
+
+        function updateCropModeUI() {
+            if (isCropMode) {
+                btnToggleCrop.className = "px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition flex items-center gap-1 shadow-sm ring-2 ring-amber-300 sm:hidden";
+                textToggleCrop.textContent = "Crop: ON";
+                if (cropStatusText) cropStatusText.textContent = "Drag across image to select/crop table region.";
+                canvas.classList.remove('touch-auto');
+                canvas.classList.add('touch-none');
+            } else {
+                btnToggleCrop.className = "px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center gap-1 shadow-sm sm:hidden";
+                textToggleCrop.textContent = "Crop Mode";
+                if (cropStatusText) cropStatusText.textContent = "Scroll freely, or tap Crop Mode in top right corner to select table region.";
+                canvas.classList.remove('touch-none');
+                canvas.classList.add('touch-auto');
+            }
+            lucide.createIcons();
+        }
+
         function attachCanvasPointerEvents() {
             const getCoords = (e) => {
                 const rect = canvas.getBoundingClientRect();
@@ -686,7 +758,12 @@
             };
 
             const handleStart = (e) => {
-                if (e.type.startsWith('touch')) e.preventDefault();
+                const isTouch = e.type.startsWith('touch');
+                if (isTouch && !isCropMode) {
+                    // Allow standard touch scroll when crop mode is off
+                    return;
+                }
+                if (isTouch) e.preventDefault();
                 const c = getCoords(e);
                 startX = c.x; 
                 startY = c.y; 
@@ -695,7 +772,8 @@
 
             const handleMove = (e) => {
                 if (!isDrawing) return;
-                if (e.type.startsWith('touch')) e.preventDefault();
+                const isTouch = e.type.startsWith('touch');
+                if (isTouch) e.preventDefault();
                 const c = getCoords(e);
                 drawCanvas();
                 ctx.strokeStyle = '#4f46e5';
@@ -863,6 +941,7 @@
                 syncCloudData();
                 renderAll();
                 modalUpload.classList.add('hidden');
+                updateScrollLock();
             } else {
                 const gameRecord = {
                     id: 'game_' + Date.now(),
@@ -879,6 +958,7 @@
                 btnSaveGame.disabled = false;
                 btnSaveGame.textContent = "Save to Central Storage";
                 modalUpload.classList.add('hidden');
+                updateScrollLock();
             }
         });
 
@@ -1012,11 +1092,13 @@
             img.src = url;
             link.href = url;
             modal.classList.remove('hidden');
+            updateScrollLock();
             lucide.createIcons();
         }
 
         function closePhotoModal() {
             document.getElementById('modal-image-view').classList.add('hidden');
+            updateScrollLock();
         }
 
         const leaderboardHead = document.getElementById('leaderboard-head');
@@ -1086,6 +1168,7 @@
                 };
 
                 modalConfirmPopup.classList.remove('hidden');
+                updateScrollLock();
             }
         }
 
@@ -1260,16 +1343,16 @@
                 
                 const sortedPlacements = [...(game.placements || [])].sort((a, b) => b.points - a.points);
 
-                // Title bar Edit & Delete controls
+                // Title bar Edit & Delete controls in Edit Mode (themed orange/amber button with white graphic)
                 const editGameBtn = isEditMode ? `
-                    <button onclick="openEditGameModal('${game.id}')" title="Edit Game Scorecard" class="text-slate-400 hover:text-amber-600 p-1 rounded transition flex items-center gap-1">
-                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                    <button onclick="openEditGameModal('${game.id}')" title="Edit Game Scorecard" class="bg-amber-500 hover:bg-amber-600 text-white p-1 rounded-lg transition flex items-center justify-center shadow-sm">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-white"></i>
                     </button>
                 ` : '';
 
                 const deleteGameBtn = isEditMode ? `
-                    <button onclick="confirmDeleteGame('${game.id}', ${gameNum})" title="Delete Game" class="text-slate-400 hover:text-red-600 p-1 rounded transition flex items-center gap-1">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    <button onclick="confirmDeleteGame('${game.id}', ${gameNum})" title="Delete Game" class="bg-amber-500 hover:bg-amber-600 text-white p-1 rounded-lg transition flex items-center justify-center shadow-sm">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-white"></i>
                     </button>
                 ` : '';
 
@@ -1344,10 +1427,12 @@
         document.getElementById('btn-popup-yes').addEventListener('click', () => {
             if (pendingAction) pendingAction();
             modalConfirmPopup.classList.add('hidden');
+            updateScrollLock();
         });
 
         document.getElementById('btn-popup-no').addEventListener('click', () => {
             modalConfirmPopup.classList.add('hidden');
+            updateScrollLock();
             renameSourcePlayer = null;
             renderLeaderboard();
         });
@@ -1360,6 +1445,7 @@
                 renderAll();
             };
             modalConfirmPopup.classList.remove('hidden');
+            updateScrollLock();
         }
     </script>
 </body>
