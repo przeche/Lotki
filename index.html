@@ -761,7 +761,6 @@
             const handleStart = (e) => {
                 const isTouch = e.type.startsWith('touch');
                 if (isTouch && !isCropMode) {
-                    // Allow standard touch scroll when crop mode is off
                     return;
                 }
                 if (isTouch) e.preventDefault();
@@ -805,6 +804,7 @@
 
         btnResetBox.addEventListener('click', () => { tableRegion = null; drawCanvas(); });
 
+        // SPEED-OPTIMIZED OCR HANDLER
         btnOcrScan.addEventListener('click', async () => {
             if (!currentImageObj) {
                 return alert("Please upload a scorecard image first before running AI OCR scan.");
@@ -813,20 +813,30 @@
             btnOcrScan.disabled = true;
 
             try {
+                // 1. Calculate scale factors from preview canvas back to full-res camera photo
+                const scaleX = currentImageObj.width / canvas.width;
+                const scaleY = currentImageObj.height / canvas.height;
+
                 let cropCanvas = document.createElement('canvas');
                 let cropCtx = cropCanvas.getContext('2d');
 
                 if (tableRegion && tableRegion.w > 0 && tableRegion.h > 0) {
-                    cropCanvas.width = tableRegion.w;
-                    cropCanvas.height = tableRegion.h;
-                    cropCtx.drawImage(canvas, tableRegion.x, tableRegion.y, tableRegion.w, tableRegion.h, 0, 0, tableRegion.w, tableRegion.h);
+                    const srcX = tableRegion.x * scaleX;
+                    const srcY = tableRegion.y * scaleY;
+                    const srcW = tableRegion.w * scaleX;
+                    const srcH = tableRegion.h * scaleY;
+
+                    cropCanvas.width = srcW;
+                    cropCanvas.height = srcH;
+                    cropCtx.drawImage(currentImageObj, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
                 } else {
-                    cropCanvas.width = canvas.width;
-                    cropCanvas.height = canvas.height;
-                    cropCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                    cropCanvas.width = currentImageObj.width;
+                    cropCanvas.height = currentImageObj.height;
+                    cropCtx.drawImage(currentImageObj, 0, 0);
                 }
 
-                const MAX_DIMENSION = 1600;
+                // 2. SPEED OPTIMIZATION: Max dimension cap set to 1024px (ideal sweet spot for Vision AI latency)
+                const MAX_DIMENSION = 1024;
                 let targetW = cropCanvas.width;
                 let targetH = cropCanvas.height;
 
@@ -845,10 +855,11 @@
                 optimizedCanvas.height = targetH;
                 let optCtx = optimizedCanvas.getContext('2d');
 
-                optCtx.filter = 'contrast(1.2) brightness(1.02)';
+                // Render directly without CPU-heavy filters to boost browser performance
                 optCtx.drawImage(cropCanvas, 0, 0, targetW, targetH);
 
-                const base64Data = optimizedCanvas.toDataURL('image/jpeg', 0.80).split(',')[1];
+                // 3. SPEED OPTIMIZATION: Export at 0.82 JPEG quality (~200KB–350KB payload)
+                const base64Data = optimizedCanvas.toDataURL('image/jpeg', 0.82).split(',')[1];
                 
                 const response = await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
